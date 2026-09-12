@@ -1,0 +1,6 @@
+{
+  "name": "Thunder Appz",
+  "description": "A responsive blog viewer that embeds articles dynamically from DL.surf with customization controls and interactive styling.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
