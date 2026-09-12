@@ -126,6 +126,7 @@ function saveSiteData(data: { config?: any; customPosts?: any[] }) {
       if (typeof merged.config.adsTxt === "string") {
         const publicAdsPath = path.join(process.cwd(), "public", "ads.txt");
         try {
+          fs.mkdirSync(path.dirname(publicAdsPath), { recursive: true });
           fs.writeFileSync(publicAdsPath, merged.config.adsTxt, "utf-8");
         } catch (e) {
           console.error("Could not sync to public/ads.txt:", e);
@@ -134,6 +135,7 @@ function saveSiteData(data: { config?: any; customPosts?: any[] }) {
         const distAdsPath = path.join(process.cwd(), "dist", "ads.txt");
         if (fs.existsSync(path.dirname(distAdsPath))) {
           try {
+            fs.mkdirSync(path.dirname(distAdsPath), { recursive: true });
             fs.writeFileSync(distAdsPath, merged.config.adsTxt, "utf-8");
           } catch (e) {}
         }
@@ -142,6 +144,7 @@ function saveSiteData(data: { config?: any; customPosts?: any[] }) {
       // Sync site_config.json
       const publicConfigPath = path.join(process.cwd(), "public", "site_config.json");
       try {
+        fs.mkdirSync(path.dirname(publicConfigPath), { recursive: true });
         fs.writeFileSync(publicConfigPath, JSON.stringify(merged, null, 2), "utf-8");
       } catch (e) {
         console.error("Could not sync to public/site_config.json:", e);
@@ -150,6 +153,7 @@ function saveSiteData(data: { config?: any; customPosts?: any[] }) {
       const distConfigPath = path.join(process.cwd(), "dist", "site_config.json");
       if (fs.existsSync(path.dirname(distConfigPath))) {
         try {
+          fs.mkdirSync(path.dirname(distConfigPath), { recursive: true });
           fs.writeFileSync(distConfigPath, JSON.stringify(merged, null, 2), "utf-8");
         } catch (e) {}
       }
@@ -159,10 +163,12 @@ function saveSiteData(data: { config?: any; customPosts?: any[] }) {
     try {
       const sitemapXml = generateSitemapXml("thunder-appz.eu.org", merged);
       const publicSitemapPath = path.join(process.cwd(), "public", "sitemap.xml");
+      fs.mkdirSync(path.dirname(publicSitemapPath), { recursive: true });
       fs.writeFileSync(publicSitemapPath, sitemapXml, "utf-8");
 
       const distSitemapPath = path.join(process.cwd(), "dist", "sitemap.xml");
       if (fs.existsSync(path.dirname(distSitemapPath))) {
+        fs.mkdirSync(path.dirname(distSitemapPath), { recursive: true });
         fs.writeFileSync(distSitemapPath, sitemapXml, "utf-8");
       }
     } catch (e) {
@@ -178,7 +184,7 @@ function saveSiteData(data: { config?: any; customPosts?: any[] }) {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   app.use(express.json({ limit: "10mb" }));
 
