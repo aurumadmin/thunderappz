@@ -128,19 +128,22 @@ export async function fetchDlSurfCreatorPosts(
   
   // List of endpoints to try sequentially
   const fetchCandidates = [
-    // 1. Local Node.js server proxy (handles CORS on backend if server is running)
+    // 1. Primary backend proxy (Express server or Cloudflare Workers/_worker.js/Functions proxy)
     `/api/dlsurf/creator/${encodeURIComponent(cleanUser)}?limit=${limit}`,
     
-    // 2. AllOrigins raw proxy (returns clean JSON directly)
+    // 2. Corsproxy.io
+    `https://corsproxy.io/?${encodeURIComponent(directUrl)}`,
+
+    // 3. AllOrigins raw proxy
     `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`,
     
-    // 3. Codetabs CORS proxy
+    // 4. Codetabs CORS proxy
     `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(directUrl)}`,
     
-    // 4. Wrapped AllOrigins proxy
+    // 5. Wrapped AllOrigins proxy
     `https://api.allorigins.win/get?url=${encodeURIComponent(directUrl)}`,
     
-    // 5. Direct call
+    // 6. Direct call
     directUrl,
   ];
 
@@ -199,19 +202,22 @@ export async function fetchDlSurfDoc(
   const directUrl = `https://docapi.dl.surf/api/doc/${encodeURIComponent(cleanUser)}/${encodeURIComponent(cleanSlug)}`;
 
   const fetchCandidates = [
-    // 1. Local backend proxy
+    // 1. Primary backend proxy (Express server or Cloudflare Workers/_worker.js/Functions proxy)
     `/api/dlsurf/doc/${encodeURIComponent(cleanUser)}/${encodeURIComponent(cleanSlug)}`,
     
-    // 2. AllOrigins raw proxy
+    // 2. Corsproxy.io
+    `https://corsproxy.io/?${encodeURIComponent(directUrl)}`,
+
+    // 3. AllOrigins raw proxy
     `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`,
     
-    // 3. Codetabs CORS proxy
+    // 4. Codetabs CORS proxy
     `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(directUrl)}`,
     
-    // 4. Wrapped AllOrigins proxy
+    // 5. Wrapped AllOrigins proxy
     `https://api.allorigins.win/get?url=${encodeURIComponent(directUrl)}`,
     
-    // 5. Direct call
+    // 6. Direct call
     directUrl,
   ];
 
