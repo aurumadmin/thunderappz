@@ -94,17 +94,20 @@ export async function fetchDlSurfCreatorPosts(
     // 1. Primary backend proxy (Express server or Cloudflare Workers/_worker.js/Functions proxy)
     `/api/dlsurf/creator/${encodeURIComponent(cleanUser)}?limit=${limit}`,
     
-    // 2. Codetabs CORS proxy
+    // 2. Direct call (if server-side or CORS enabled)
+    directUrl,
+
+    // 3. Corsproxy.io
+    `https://corsproxy.io/?${encodeURIComponent(directUrl)}`,
+
+    // 4. Codetabs CORS proxy
     `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(directUrl)}`,
     
-    // 3. AllOrigins raw proxy
+    // 5. AllOrigins raw proxy
     `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`,
     
-    // 4. Wrapped AllOrigins proxy
+    // 6. Wrapped AllOrigins proxy
     `https://api.allorigins.win/get?url=${encodeURIComponent(directUrl)}`,
-    
-    // 5. Direct call
-    directUrl,
   ];
 
   let lastError: Error | null = null;
@@ -164,17 +167,20 @@ export async function fetchDlSurfDoc(
     // 1. Primary backend proxy (Express server or Cloudflare Workers/_worker.js/Functions proxy)
     `/api/dlsurf/doc/${encodeURIComponent(cleanUser)}/${encodeURIComponent(cleanSlug)}`,
     
-    // 2. Codetabs CORS proxy
+    // 2. Direct call (if server-side or CORS enabled)
+    directUrl,
+
+    // 3. Corsproxy.io
+    `https://corsproxy.io/?${encodeURIComponent(directUrl)}`,
+
+    // 4. Codetabs CORS proxy
     `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(directUrl)}`,
     
-    // 3. AllOrigins raw proxy
+    // 5. AllOrigins raw proxy
     `https://api.allorigins.win/raw?url=${encodeURIComponent(directUrl)}`,
     
-    // 4. Wrapped AllOrigins proxy
+    // 6. Wrapped AllOrigins proxy
     `https://api.allorigins.win/get?url=${encodeURIComponent(directUrl)}`,
-    
-    // 5. Direct call
-    directUrl,
   ];
 
   let lastError: Error | null = null;
