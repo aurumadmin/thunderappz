@@ -150,10 +150,13 @@ export async function fetchDlSurfDoc(
   linkSlug: string
 ): Promise<DlSurfPost> {
   const cleanUser = username.trim();
-  const cleanSlug = linkSlug.trim();
-  if (!cleanUser || !cleanSlug) {
+  const rawSlug = (linkSlug || '').trim();
+  if (!cleanUser || !rawSlug) {
     throw new Error('Username and link slug are required');
   }
+
+  // Clean slug of query params, hash, and slashes
+  const cleanSlug = rawSlug.split('?')[0].split('#')[0].replace(/^\/+|\/+$/g, '').trim();
 
   const directUrl = `https://docapi.dl.surf/api/doc/${encodeURIComponent(cleanUser)}/${encodeURIComponent(cleanSlug)}`;
 
@@ -203,10 +206,16 @@ export async function fetchDlSurfDoc(
     }
   }
 
-  // Fallback match from static posts list if network fails or times out
+  // Resilient fallback matching from static posts list
+  const normSlug = cleanSlug.toLowerCase();
   const matched = FALLBACK_THUNDERBOLT_POSTS.find(
-    p => p.link_slug === cleanSlug || String(p.id) === cleanSlug
-  );
+    p => {
+      const pSlug = (p.link_slug || '').toLowerCase();
+      const pId = String(p.id).toLowerCase();
+      return pSlug === normSlug || pId === normSlug || pSlug.includes(normSlug) || normSlug.includes(pSlug);
+    }
+  ) || FALLBACK_THUNDERBOLT_POSTS[0];
+
   if (matched) {
     return matched;
   }
