@@ -11,7 +11,7 @@ import { SecurityShield } from './components/SecurityShield';
 import { AdsLabSdkInit } from './components/AdsLabSdkInit';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { BlogConfig, DEFAULT_CONFIG, CustomPost, INITIAL_CUSTOM_POSTS, getPostCategories } from './types';
-import { fetchDlSurfCreatorPosts } from './lib/dlsurfApi';
+import { fetchDlSurfCreatorPosts, FALLBACK_THUNDERBOLT_POSTS } from './lib/dlsurfApi';
 import { 
   Sparkles, ArrowLeft, BookOpen, Clock, Calendar, ChevronRight, User, 
   Shield, Compass, Search, TrendingUp, Send, Mail, Share2, Grid, Tag, Newspaper 
@@ -262,14 +262,17 @@ export default function App() {
 
   // Fetch DL.surf posts dynamically when username or limit changes
   const reloadDlSurfPosts = React.useCallback(async () => {
-    if (!config.username) return;
+    if (!config.username) {
+      setDlSurfPosts(FALLBACK_THUNDERBOLT_POSTS);
+      return;
+    }
     setIsLoadingDl(true);
     try {
       const posts = await fetchDlSurfCreatorPosts(config.username, config.limit || 40);
-      setDlSurfPosts(posts);
+      setDlSurfPosts(posts && posts.length > 0 ? posts : FALLBACK_THUNDERBOLT_POSTS);
     } catch (err) {
       console.error('Error in App.tsx fetching DL.surf posts:', err);
-      setDlSurfPosts([]);
+      setDlSurfPosts(FALLBACK_THUNDERBOLT_POSTS);
     } finally {
       setIsLoadingDl(false);
     }
