@@ -598,6 +598,17 @@ async function startServer() {
     res.status(200).send("ccnsad-site-verification: 4ccb4671cf77c66c");
   });
 
+  // Serve coinserom_fjriMMFNHggl.txt verification file
+  app.get("/coinserom_fjriMMFNHggl.txt", (req, res) => {
+    const filePath = path.join(process.cwd(), "public", "coinserom_fjriMMFNHggl.txt");
+    if (fs.existsSync(filePath)) {
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      return res.status(200).sendFile(filePath);
+    }
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.status(200).send("Verification code: fjriMMFNHggl\nDomain: thunder-appz.eu.org\n");
+  });
+
   // Serve sitemap.xml dynamically for Google Search Console and crawlers
   app.get("/sitemap.xml", (req, res) => {
     try {
