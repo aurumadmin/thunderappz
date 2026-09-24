@@ -204,11 +204,14 @@ export default function App() {
       } else if (
         path.startsWith('/go') || 
         path.startsWith('/safelink') || 
+        path.startsWith('/faucet') || 
         params.get('go') !== null || 
         params.get('safelink') !== null ||
+        params.get('faucet') !== null ||
         (params.get('code') !== null && params.get('token') !== null) ||
         hash.startsWith('#go') ||
-        hash.startsWith('#safelink')
+        hash.startsWith('#safelink') ||
+        hash.startsWith('#faucet')
       ) {
         setCurrentView('safelink');
       } else if (hash === '#admin' || params.get('admin') !== null) {
@@ -237,11 +240,14 @@ export default function App() {
       } else if (
         path.startsWith('/go') || 
         path.startsWith('/safelink') || 
+        path.startsWith('/faucet') || 
         params.get('go') !== null || 
         params.get('safelink') !== null ||
+        params.get('faucet') !== null ||
         (params.get('code') !== null && params.get('token') !== null) ||
         hash.startsWith('#go') ||
-        hash.startsWith('#safelink')
+        hash.startsWith('#safelink') ||
+        hash.startsWith('#faucet')
       ) {
         setCurrentView('safelink');
       } else if (hash === '#admin' || params.get('admin') !== null) {

@@ -86,6 +86,16 @@ export interface SafelinkAdminConfig {
   requireTabFocusReturnTimer?: boolean;
   tabFocusReturnSeconds?: number;
   clickTrackedSlots?: string[];
+
+  // Faucet Traffic Mode Configuration
+  enableFaucetMode?: boolean;
+  faucetStepsCount?: number;
+  faucetStepTimer?: number;
+  faucetClicksRequiredPerStep?: number;
+  faucetDestinationUrl?: string;
+  faucetHeadingTitle?: string;
+  faucetStepMessage?: string;
+  faucetButtonLabel?: string;
 }
 
 export interface BlogConfig {

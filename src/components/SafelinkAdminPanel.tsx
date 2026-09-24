@@ -79,6 +79,16 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
     requireTabFocusReturnTimer: config.safelinkConfig?.requireTabFocusReturnTimer ?? true,
     tabFocusReturnSeconds: config.safelinkConfig?.tabFocusReturnSeconds ?? 5,
     clickTrackedSlots: config.safelinkConfig?.clickTrackedSlots || ['headerBanner', 'footerBanner', 'sidebarBanner', 'aboveTimerBanner', 'belowTimerBanner'],
+
+    // Faucet Traffic Mode Configuration
+    enableFaucetMode: config.safelinkConfig?.enableFaucetMode ?? true,
+    faucetStepsCount: config.safelinkConfig?.faucetStepsCount ?? 3,
+    faucetStepTimer: config.safelinkConfig?.faucetStepTimer ?? 10,
+    faucetClicksRequiredPerStep: config.safelinkConfig?.faucetClicksRequiredPerStep ?? 1,
+    faucetDestinationUrl: config.safelinkConfig?.faucetDestinationUrl || 'https://thunder-appz.eu.org/',
+    faucetHeadingTitle: config.safelinkConfig?.faucetHeadingTitle || 'Continue',
+    faucetStepMessage: config.safelinkConfig?.faucetStepMessage || 'There is no shortlink on this step. Simply click Continue once the timer finishes to proceed.',
+    faucetButtonLabel: config.safelinkConfig?.faucetButtonLabel || 'Continue',
   };
 
   const [authenticated, setAuthenticated] = useState<boolean>(false);
@@ -86,7 +96,7 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
   const [authError, setAuthError] = useState<string>('');
 
   const [formConfig, setFormConfig] = useState<SafelinkAdminConfig>(currentSafelinkConfig);
-  const [activeTab, setActiveTab] = useState<'ads' | 'adslab' | 'timers' | 'security' | 'autoScript' | 'tester'>('ads');
+  const [activeTab, setActiveTab] = useState<'ads' | 'adslab' | 'timers' | 'faucet' | 'security' | 'autoScript' | 'tester'>('ads');
   const [testShieldOpen, setTestShieldOpen] = useState<boolean>(false);
   const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
   
@@ -348,6 +358,18 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
         >
           <Settings className="w-4 h-4" />
           Timers & Step Customization
+        </button>
+
+        <button
+          onClick={() => setActiveTab('faucet')}
+          className={`px-5 py-3 text-xs font-semibold uppercase tracking-wider border-b-2 whitespace-nowrap transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === 'faucet'
+              ? 'border-amber-500 text-amber-400 bg-amber-500/5'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Sparkles className="w-4 h-4 text-amber-400" />
+          Faucet Traffic Mode
         </button>
 
         <button
@@ -1169,6 +1191,178 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
               <p className="text-[11px] text-slate-500 mt-1.5">
                 Password required to login at <code className="text-slate-300">/safelink/admin</code>.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Faucet Traffic Mode */}
+      {activeTab === 'faucet' && (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-amber-500/30 rounded-2xl p-6 space-y-6 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+              <div>
+                <h3 className="text-base font-bold text-amber-400 flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-amber-400" />
+                  Faucet Traffic Mode Configuration
+                </h3>
+                <p className="text-xs text-slate-300 mt-1">
+                  Customize the multi-step verification sequence for Faucet and PTC traffic. Each step forces a full page reload to maximize banner ad impressions and CTR revenue.
+                </p>
+              </div>
+
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={formConfig.enableFaucetMode ?? true}
+                  onChange={(e) => setFormConfig({ ...formConfig, enableFaucetMode: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                <span className="ml-3 text-xs font-bold uppercase tracking-wider text-slate-200">
+                  {formConfig.enableFaucetMode ? 'Faucet Mode Active' : 'Faucet Mode Disabled'}
+                </span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-amber-300 mb-2">
+                  Number of Steps for Faucet Traffic
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={formConfig.faucetStepsCount ?? 3}
+                  onChange={(e) =>
+                    setFormConfig({ ...formConfig, faucetStepsCount: Math.max(1, parseInt(e.target.value) || 1) })
+                  }
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 font-bold focus:outline-none focus:border-amber-500 text-sm"
+                />
+                <p className="text-[11px] text-slate-400 mt-1.5">Default: 3 steps (e.g. Step 1/3, Step 2/3, Step 3/3).</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-amber-300 mb-2">
+                  Step Timer (Seconds per Step)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={formConfig.faucetStepTimer ?? 10}
+                  onChange={(e) =>
+                    setFormConfig({ ...formConfig, faucetStepTimer: Math.max(1, parseInt(e.target.value) || 1) })
+                  }
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 font-bold focus:outline-none focus:border-amber-500 text-sm"
+                />
+                <p className="text-[11px] text-slate-400 mt-1.5">Countdown required before Continue button unlocks.</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-amber-300 mb-2">
+                  Required Ad Clicks per Step
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={5}
+                  value={formConfig.faucetClicksRequiredPerStep ?? 1}
+                  onChange={(e) =>
+                    setFormConfig({ ...formConfig, faucetClicksRequiredPerStep: Math.max(0, parseInt(e.target.value) || 0) })
+                  }
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 font-bold focus:outline-none focus:border-amber-500 text-sm"
+                />
+                <p className="text-[11px] text-slate-400 mt-1.5">Clicks required on banner ads per step (0 to disable).</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 pt-2">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
+                  Default Faucet Destination Target URL
+                </label>
+                <input
+                  type="url"
+                  value={formConfig.faucetDestinationUrl || ''}
+                  onChange={(e) => setFormConfig({ ...formConfig, faucetDestinationUrl: e.target.value })}
+                  placeholder="https://thunder-appz.eu.org/ or https://faucetpay.io/claim"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-xs focus:outline-none focus:border-amber-500 font-mono"
+                />
+                <p className="text-[11px] text-slate-400 mt-1.5">
+                  Fallback destination URL if no dynamic <code className="text-amber-400">?url=https://...</code> parameter is passed in link.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
+                    Faucet Step Heading Title
+                  </label>
+                  <input
+                    type="text"
+                    value={formConfig.faucetHeadingTitle || ''}
+                    onChange={(e) => setFormConfig({ ...formConfig, faucetHeadingTitle: e.target.value })}
+                    placeholder="Continue"
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-xs focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
+                    Faucet Step Description Message
+                  </label>
+                  <input
+                    type="text"
+                    value={formConfig.faucetStepMessage || ''}
+                    onChange={(e) => setFormConfig({ ...formConfig, faucetStepMessage: e.target.value })}
+                    placeholder="There is no shortlink on this step. Simply click Continue once the timer finishes to proceed."
+                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-xs focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Faucet Test Link Generator Box */}
+            <div className="mt-6 pt-6 border-t border-slate-800 bg-slate-950/80 p-5 rounded-xl border border-amber-500/20">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400 mb-2 flex items-center gap-2">
+                <ExternalLink className="w-4 h-4" />
+                Faucet URL Generator & Tester
+              </h4>
+              <p className="text-xs text-slate-300 mb-4">
+                Use this link pattern on your Faucet / Shortlink micro-tasks. Users clicking this link will enter the {formConfig.faucetStepsCount || 3}-step refresh sequence.
+              </p>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="text"
+                  readOnly
+                  value={`${window.location.origin}/faucet/?url=${encodeURIComponent(formConfig.faucetDestinationUrl || 'https://thunder-appz.eu.org/')}&step=1&total=${formConfig.faucetStepsCount || 3}`}
+                  className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs text-amber-300 font-mono focus:outline-none select-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const testUrl = `${window.location.origin}/faucet/?url=${encodeURIComponent(formConfig.faucetDestinationUrl || 'https://thunder-appz.eu.org/')}&step=1&total=${formConfig.faucetStepsCount || 3}`;
+                    navigator.clipboard.writeText(testUrl);
+                    alert('Faucet Test Link copied to clipboard!');
+                  }}
+                  className="px-4 py-3 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold text-xs rounded-xl transition-all shrink-0 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Copy className="w-4 h-4" />
+                  Copy Faucet Link
+                </button>
+                <a
+                  href={`/faucet/?url=${encodeURIComponent(formConfig.faucetDestinationUrl || 'https://thunder-appz.eu.org/')}&step=1&total=${formConfig.faucetStepsCount || 3}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold text-xs rounded-xl transition-all shrink-0 cursor-pointer flex items-center justify-center gap-2 border border-slate-700"
+                >
+                  <Eye className="w-4 h-4 text-amber-400" />
+                  Test Faucet Flow
+                </a>
+              </div>
             </div>
           </div>
         </div>

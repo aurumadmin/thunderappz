@@ -93,6 +93,117 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
   );
   const isClickAdsRequirementMet = totalClickedCount >= requiredClickAdsCount;
 
+  // 5. Faucet Traffic Mode State & Handlers
+  const isFaucetTraffic = 
+    window.location.pathname.startsWith('/faucet') ||
+    fullParams.get('faucet') !== null ||
+    fullParams.get('type') === 'faucet' ||
+    fullParams.get('mode') === 'faucet' ||
+    (safelinkCfg.enableFaucetMode && window.location.hash.startsWith('#faucet'));
+
+  // Total steps for faucet traffic
+  const faucetTotalSteps = Math.max(1, parseInt(
+    fullParams.get('total') || fullParams.get('steps') || String(safelinkCfg.faucetStepsCount || 3),
+    10
+  ));
+
+  // Current step number
+  const currentFaucetStep = Math.min(
+    faucetTotalSteps,
+    Math.max(1, parseInt(fullParams.get('step') || fullParams.get('click') || '1', 10))
+  );
+
+  // Faucet timer per step in seconds
+  const faucetStepTimerSeconds = parseInt(
+    fullParams.get('timer') || String(safelinkCfg.faucetStepTimer || 10),
+    10
+  );
+
+  const [faucetTimer, setFaucetTimer] = useState<number>(faucetStepTimerSeconds);
+  const [faucetTimerDone, setFaucetTimerDone] = useState<boolean>(faucetStepTimerSeconds <= 0);
+
+  useEffect(() => {
+    if (!isFaucetTraffic) return;
+
+    setFaucetTimer(faucetStepTimerSeconds);
+    setFaucetTimerDone(faucetStepTimerSeconds <= 0);
+
+    if (faucetStepTimerSeconds <= 0) return;
+
+    const timer = setInterval(() => {
+      setFaucetTimer((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setFaucetTimerDone(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [isFaucetTraffic, currentFaucetStep, faucetStepTimerSeconds]);
+
+  // Destination URL resolution for Faucet Mode
+  const getFaucetDestinationUrl = (): string => {
+    const urlParam = fullParams.get('url') || fullParams.get('link') || fullParams.get('dest') || fullParams.get('target');
+    if (urlParam) return urlParam;
+
+    if (code && code.startsWith('st_')) {
+      try {
+        const b64 = code.replace('st_', '');
+        const decoded = atob(b64);
+        if (decoded.startsWith('http://') || decoded.startsWith('https://')) {
+          return decoded;
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    return safelinkCfg.faucetDestinationUrl || 'https://thunder-appz.eu.org/';
+  };
+
+  const faucetRequiredClicks = safelinkCfg.faucetClicksRequiredPerStep !== undefined 
+    ? safelinkCfg.faucetClicksRequiredPerStep 
+    : 1;
+
+  const isFaucetClickAdMet = !isClickGateEnabled || faucetRequiredClicks === 0 || totalClickedCount >= faucetRequiredClicks;
+  const isFaucetStepReady = faucetTimerDone && isFaucetClickAdMet && !isVerifyingAdClick && !isRedirecting;
+
+  // Handle step progression with full page refresh to reload ads and maximize revenue
+  const handleAdvanceFaucetStep = () => {
+    if (!isFaucetStepReady) return;
+
+    const targetDest = getFaucetDestinationUrl();
+
+    if (currentFaucetStep < faucetTotalSteps) {
+      const nextStep = currentFaucetStep + 1;
+      const nextUrl = new URL(window.location.href);
+      nextUrl.pathname = '/faucet/';
+      nextUrl.searchParams.set('faucet', '1');
+      nextUrl.searchParams.set('step', String(nextStep));
+      nextUrl.searchParams.set('total', String(faucetTotalSteps));
+      nextUrl.searchParams.set('url', targetDest);
+      nextUrl.searchParams.set('click', String(nextStep));
+
+      // Reload page for next step
+      window.location.href = nextUrl.toString();
+    } else {
+      setIsRedirecting(true);
+
+      if (typeof window.showint_adslab === 'function') {
+        window.showint_adslab().catch(() => {});
+      } else if (typeof window.adslabShowInterstitial === 'function') {
+        try { window.adslabShowInterstitial(); } catch (e) {}
+      }
+
+      setTimeout(() => {
+        window.location.href = targetDest;
+      }, 400);
+    }
+  };
+
   // Randomized Banner Code & Size State for Click Ad Gate (Initializes ONCE to prevent auto-reloading)
   const [randomAdCode, setRandomAdCode] = useState<string>('');
   const [randomAdSize, setRandomAdSize] = useState<AdSize>('responsive');
@@ -640,7 +751,214 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6 sm:px-6 lg:px-8">
+      {isFaucetTraffic ? (
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-8 sm:px-6 lg:px-8">
+          
+          {/* Header Ad Slot */}
+          {(safelinkCfg.headerBanner || config.headerAdCode) && (
+            <div className="mb-6 flex justify-center">
+              <AdSlot
+                code={safelinkCfg.headerBanner || config.headerAdCode}
+                slotId="faucet-header-ad"
+                label="Top Leaderboard Banner Ad"
+                adSize={safelinkCfg.headerBannerSize || '728x90'}
+                showPlaceholder={false}
+                className="w-full"
+                isClickTrackingActive={false}
+              />
+            </div>
+          )}
+
+          {/* Centered Step Card Container (Matching Screenshot 2 Design) */}
+          <div className="max-w-2xl mx-auto bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-md text-center space-y-6 relative overflow-hidden">
+            
+            {/* Header Subtitle & Title */}
+            <div>
+              <span className="text-xs font-bold uppercase tracking-widest text-slate-400 font-mono">
+                Step {currentFaucetStep}/{faucetTotalSteps}
+              </span>
+              <h2 className="text-3xl font-extrabold text-white tracking-tight mt-1">
+                {safelinkCfg.faucetHeadingTitle || 'Continue'}
+              </h2>
+              <p className="text-sm text-slate-300 max-w-md mx-auto mt-2 leading-relaxed">
+                {safelinkCfg.faucetStepMessage || 'There is no shortlink on this step. Simply click Continue once the timer finishes to proceed.'}
+              </p>
+            </div>
+
+            {/* Step Milestone Badges (Matching Screenshot 2) */}
+            <div className="flex items-center justify-center gap-2 sm:gap-3 py-3 px-4 bg-slate-950/70 rounded-2xl border border-slate-800/80 text-xs font-semibold overflow-x-auto">
+              {/* Badge 1: Wait Timer */}
+              <div className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 shrink-0 font-medium ${
+                faucetTimerDone 
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                  : 'bg-blue-600 text-white shadow-md shadow-blue-500/20 animate-pulse'
+              }`}>
+                {faucetTimerDone ? (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Wait Timer</span>
+                  </>
+                ) : (
+                  <>
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>Timer ({faucetTimer}s)</span>
+                  </>
+                )}
+              </div>
+
+              <span className="text-slate-600">➔</span>
+
+              {/* Badge 2: Click Continue */}
+              <div className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 shrink-0 ${
+                currentFaucetStep < faucetTotalSteps
+                  ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-500/20'
+                  : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+              }`}>
+                <span className="w-4 h-4 rounded-full bg-white/20 text-[10px] flex items-center justify-center font-bold">
+                  {currentFaucetStep}
+                </span>
+                <span>Click Continue</span>
+              </div>
+
+              <span className="text-slate-600">➔</span>
+
+              {/* Badge 3: Get Link */}
+              <div className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 shrink-0 ${
+                currentFaucetStep === faucetTotalSteps
+                  ? 'bg-emerald-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/30 animate-bounce'
+                  : 'bg-slate-800 text-slate-400 border border-slate-700/50'
+              }`}>
+                <span className="w-4 h-4 rounded-full bg-black/20 text-[10px] flex items-center justify-center font-bold">
+                  {faucetTotalSteps}
+                </span>
+                <span>Get Link</span>
+              </div>
+            </div>
+
+            {/* Progress Box (Matching Screenshot 2) */}
+            <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-4 text-left space-y-2">
+              <div className="flex items-center justify-between text-xs font-semibold">
+                <span className="text-slate-200">
+                  Step Progress (Click {currentFaucetStep}/{faucetTotalSteps * Math.max(1, faucetRequiredClicks)})
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[11px] font-bold">
+                  {isFaucetStepReady 
+                    ? 'Ready to Proceed • 100% Completed' 
+                    : `Getting Ready • ${Math.round(((currentFaucetStep - 1 + (faucetTimerDone ? 1 : 0)) / faucetTotalSteps) * 100)}% Completed`}
+                </span>
+              </div>
+
+              {/* Progress Bar Track */}
+              <div className="h-2.5 w-full bg-slate-800 rounded-full overflow-hidden border border-slate-700/50">
+                <div 
+                  className="bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-400 transition-all duration-500 h-full rounded-full"
+                  style={{
+                    width: `${Math.min(100, Math.max(10, Math.round(((currentFaucetStep - 1 + (faucetTimerDone ? 1 : 0)) / faucetTotalSteps) * 100)))}%`
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* In-Step Middle Banner Ad Slot */}
+            {(safelinkCfg.middleBanner || safelinkCfg.aboveTimerBanner || config.inPostAdCode) && (
+              <div className="my-4 flex justify-center">
+                <AdSlot
+                  code={safelinkCfg.middleBanner || safelinkCfg.aboveTimerBanner || config.inPostAdCode}
+                  slotId="faucet-middle-ad"
+                  label="In-Step Banner Ad"
+                  adSize={safelinkCfg.aboveTimerBannerSize || '300x250'}
+                  showPlaceholder={false}
+                  onAdClicked={() => handleAdSlotClicked('faucet-middle-ad')}
+                  isClickTrackingActive={isClickGateEnabled}
+                />
+              </div>
+            )}
+
+            {/* Click Ad Gate Instruction (if required clicks not met) */}
+            {!isFaucetClickAdMet && (
+              <div className="p-4 rounded-xl bg-rose-950/30 border border-rose-500/40 text-xs text-rose-300 flex items-center justify-between gap-3 text-left">
+                <div className="flex items-center gap-2">
+                  <MousePointerClick className="w-5 h-5 text-rose-400 animate-pulse shrink-0" />
+                  <span>
+                    <strong>Ad Click Required:</strong> Please click 1 banner ad on this step to verify and unlock the Continue button.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Link Ready Green Box (Matching Screenshot 2) */}
+            {isFaucetStepReady && (
+              <div className="bg-emerald-950/30 border border-emerald-500/40 rounded-2xl p-5 my-4 flex items-center gap-4 text-left shadow-lg shadow-emerald-500/5 animate-fade-in">
+                <div className="w-12 h-12 rounded-full bg-emerald-500 flex items-center justify-center text-slate-950 shrink-0 shadow-md shadow-emerald-500/20">
+                  <Check className="w-7 h-7 stroke-[3]" />
+                </div>
+                <div>
+                  <h4 className="text-emerald-400 font-extrabold text-lg flex items-center gap-1.5">
+                    ✓ Link Ready!
+                  </h4>
+                  <p className="text-slate-300 text-xs mt-0.5">
+                    Click the glowing Continue button below
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Tip Alert Box (Matching Screenshot 2) */}
+            <div className="bg-blue-950/30 border border-blue-500/30 rounded-xl p-3.5 text-xs text-blue-300 flex items-center justify-center gap-2">
+              <Sparkles className="w-4 h-4 text-blue-400 shrink-0" />
+              <span>Tip: If an ad opens in a new tab, return here to continue.</span>
+            </div>
+
+            {/* Action Continue Button (Glowing Primary Button - Reloads Page on Click) */}
+            <div>
+              <button
+                type="button"
+                disabled={!isFaucetStepReady}
+                onClick={handleAdvanceFaucetStep}
+                className={`w-full py-4 px-6 text-center text-lg font-bold rounded-xl transition-all shadow-xl flex items-center justify-center gap-2 cursor-pointer ${
+                  isFaucetStepReady
+                    ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/30 hover:shadow-blue-500/50 hover:scale-[1.01] active:scale-[0.99] animate-pulse ring-2 ring-blue-400/50'
+                    : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50'
+                }`}
+              >
+                <span>
+                  {isRedirecting 
+                    ? 'Opening Destination...' 
+                    : isFaucetStepReady 
+                    ? currentFaucetStep < faucetTotalSteps 
+                      ? 'Continue ➔' 
+                      : 'Get Link ➔' 
+                    : !faucetTimerDone 
+                    ? `Please wait ${faucetTimer}s...`
+                    : `Click 1 Banner Ad Above...`}
+                </span>
+              </button>
+
+              <span className="text-slate-400 text-xs mt-3 block">
+                Step {currentFaucetStep}/{faucetTotalSteps} — Direct Step (No Shortlink)
+              </span>
+            </div>
+
+            {/* Below Button Banner Ad Slot */}
+            {(safelinkCfg.belowTimerBanner || config.footerAdCode) && (
+              <div className="mt-6 flex justify-center">
+                <AdSlot
+                  code={safelinkCfg.belowTimerBanner || config.footerAdCode}
+                  slotId="faucet-below-ad"
+                  label="Below Action Banner Ad"
+                  adSize={safelinkCfg.belowTimerBannerSize || '468x60'}
+                  showPlaceholder={false}
+                  onAdClicked={() => handleAdSlotClicked('faucet-below-ad')}
+                  isClickTrackingActive={isClickGateEnabled}
+                />
+              </div>
+            )}
+
+          </div>
+
+        </main>
+      ) : (
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6 sm:px-6 lg:px-8">
         
         {/* Top Leaderboard Banner Ad Slot (728x90 / Custom) */}
         {(safelinkCfg.headerBanner || config.headerAdCode) && (
@@ -1003,6 +1321,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
           </button>
         </div>
       </main>
+      )}
 
       {/* PTC Task Modal for viewing */}
       {activeTask && (
