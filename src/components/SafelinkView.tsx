@@ -101,19 +101,37 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
     fullParams.get('mode') === 'faucet' ||
     (safelinkCfg.enableFaucetMode && window.location.hash.startsWith('#faucet'));
 
-  // Total steps for faucet traffic
+  // Total main steps for faucet traffic
   const faucetTotalSteps = Math.max(1, parseInt(
-    fullParams.get('total') || fullParams.get('steps') || String(safelinkCfg.faucetStepsCount || 3),
+    fullParams.get('total_steps') || fullParams.get('steps') || fullParams.get('total') || String(safelinkCfg.faucetStepsCount || 3),
     10
   ));
 
-  // Current step number
+  // Pages per step (sub-clicks before advancing step)
+  const faucetPagesPerStep = Math.max(1, parseInt(
+    fullParams.get('pages_per_step') || fullParams.get('pps') || fullParams.get('pages') || String(safelinkCfg.faucetPagesPerStep || 3),
+    10
+  ));
+
+  // Current step number (1 to faucetTotalSteps)
   const currentFaucetStep = Math.min(
     faucetTotalSteps,
-    Math.max(1, parseInt(fullParams.get('step') || fullParams.get('click') || '1', 10))
+    Math.max(1, parseInt(fullParams.get('step') || '1', 10))
   );
 
-  // Faucet timer per step in seconds
+  // Current page within step (1 to faucetPagesPerStep)
+  const currentFaucetPage = Math.min(
+    faucetPagesPerStep,
+    Math.max(1, parseInt(fullParams.get('page') || fullParams.get('click') || '1', 10))
+  );
+
+  // Overall total page clicks across all steps
+  const totalPagesAcrossSteps = faucetTotalSteps * faucetPagesPerStep;
+
+  // Overall current page click index (1 to totalPagesAcrossSteps)
+  const currentOverallClickIndex = (currentFaucetStep - 1) * faucetPagesPerStep + currentFaucetPage;
+
+  // Faucet timer per page in seconds
   const faucetStepTimerSeconds = parseInt(
     fullParams.get('timer') || String(safelinkCfg.faucetStepTimer || 10),
     10
@@ -142,7 +160,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isFaucetTraffic, currentFaucetStep, faucetStepTimerSeconds]);
+  }, [isFaucetTraffic, currentFaucetStep, currentFaucetPage, faucetStepTimerSeconds]);
 
   // Destination URL resolution for Faucet Mode
   const getFaucetDestinationUrl = (): string => {
@@ -171,25 +189,42 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
   const isFaucetClickAdMet = !isClickGateEnabled || faucetRequiredClicks === 0 || totalClickedCount >= faucetRequiredClicks;
   const isFaucetStepReady = faucetTimerDone && isFaucetClickAdMet && !isVerifyingAdClick && !isRedirecting;
 
-  // Handle step progression with full page refresh to reload ads and maximize revenue
+  // Handle step & page progression with full page refresh to reload ads and maximize revenue
   const handleAdvanceFaucetStep = () => {
     if (!isFaucetStepReady) return;
 
     const targetDest = getFaucetDestinationUrl();
 
-    if (currentFaucetStep < faucetTotalSteps) {
+    // Case 1: Next page within the SAME step
+    if (currentFaucetPage < faucetPagesPerStep) {
+      const nextPage = currentFaucetPage + 1;
+      const nextUrl = new URL(window.location.href);
+      nextUrl.pathname = '/faucet/';
+      nextUrl.searchParams.set('faucet', '1');
+      nextUrl.searchParams.set('step', String(currentFaucetStep));
+      nextUrl.searchParams.set('page', String(nextPage));
+      nextUrl.searchParams.set('total_steps', String(faucetTotalSteps));
+      nextUrl.searchParams.set('pages_per_step', String(faucetPagesPerStep));
+      nextUrl.searchParams.set('url', targetDest);
+
+      window.location.href = nextUrl.toString();
+    } 
+    // Case 2: End of pages for current step -> Advance to NEXT STEP (Step increases ONLY here)
+    else if (currentFaucetStep < faucetTotalSteps) {
       const nextStep = currentFaucetStep + 1;
       const nextUrl = new URL(window.location.href);
       nextUrl.pathname = '/faucet/';
       nextUrl.searchParams.set('faucet', '1');
       nextUrl.searchParams.set('step', String(nextStep));
-      nextUrl.searchParams.set('total', String(faucetTotalSteps));
+      nextUrl.searchParams.set('page', '1');
+      nextUrl.searchParams.set('total_steps', String(faucetTotalSteps));
+      nextUrl.searchParams.set('pages_per_step', String(faucetPagesPerStep));
       nextUrl.searchParams.set('url', targetDest);
-      nextUrl.searchParams.set('click', String(nextStep));
 
-      // Reload page for next step
       window.location.href = nextUrl.toString();
-    } else {
+    } 
+    // Case 3: Final page of final step -> Open destination URL
+    else {
       setIsRedirecting(true);
 
       if (typeof window.showint_adslab === 'function') {
@@ -775,7 +810,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
             {/* Header Subtitle & Title */}
             <div>
               <span className="text-xs font-bold uppercase tracking-widest text-slate-400 font-mono">
-                Step {currentFaucetStep}/{faucetTotalSteps}
+                Step {currentFaucetStep}/{faucetTotalSteps} — Click {currentOverallClickIndex}/{totalPagesAcrossSteps}
               </span>
               <h2 className="text-3xl font-extrabold text-white tracking-tight mt-1">
                 {safelinkCfg.faucetHeadingTitle || 'Continue'}
@@ -810,21 +845,21 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
 
               {/* Badge 2: Click Continue */}
               <div className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 shrink-0 ${
-                currentFaucetStep < faucetTotalSteps
+                currentFaucetStep < faucetTotalSteps || currentFaucetPage < faucetPagesPerStep
                   ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-500/20'
                   : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
               }`}>
                 <span className="w-4 h-4 rounded-full bg-white/20 text-[10px] flex items-center justify-center font-bold">
                   {currentFaucetStep}
                 </span>
-                <span>Click Continue</span>
+                <span>Click Continue ({currentFaucetPage}/{faucetPagesPerStep})</span>
               </div>
 
               <span className="text-slate-600">➔</span>
 
               {/* Badge 3: Get Link */}
               <div className={`px-3 py-1.5 rounded-full flex items-center gap-1.5 shrink-0 ${
-                currentFaucetStep === faucetTotalSteps
+                currentFaucetStep === faucetTotalSteps && currentFaucetPage === faucetPagesPerStep
                   ? 'bg-emerald-500 text-slate-950 font-bold shadow-lg shadow-emerald-500/30 animate-bounce'
                   : 'bg-slate-800 text-slate-400 border border-slate-700/50'
               }`}>
@@ -839,12 +874,12 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
             <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-4 text-left space-y-2">
               <div className="flex items-center justify-between text-xs font-semibold">
                 <span className="text-slate-200">
-                  Step Progress (Click {currentFaucetStep}/{faucetTotalSteps * Math.max(1, faucetRequiredClicks)})
+                  Step Progress (Click {currentOverallClickIndex}/{totalPagesAcrossSteps})
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[11px] font-bold">
-                  {isFaucetStepReady 
+                  {isFaucetStepReady && currentOverallClickIndex === totalPagesAcrossSteps
                     ? 'Ready to Proceed • 100% Completed' 
-                    : `Getting Ready • ${Math.round(((currentFaucetStep - 1 + (faucetTimerDone ? 1 : 0)) / faucetTotalSteps) * 100)}% Completed`}
+                    : `Getting Ready • ${Math.round(((currentOverallClickIndex - 1 + (faucetTimerDone ? 1 : 0)) / totalPagesAcrossSteps) * 100)}% Completed`}
                 </span>
               </div>
 
@@ -853,7 +888,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
                 <div 
                   className="bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-400 transition-all duration-500 h-full rounded-full"
                   style={{
-                    width: `${Math.min(100, Math.max(10, Math.round(((currentFaucetStep - 1 + (faucetTimerDone ? 1 : 0)) / faucetTotalSteps) * 100)))}%`
+                    width: `${Math.min(100, Math.max(10, Math.round(((currentOverallClickIndex - 1 + (faucetTimerDone ? 1 : 0)) / totalPagesAcrossSteps) * 100)))}%`
                   }}
                 />
               </div>
@@ -925,17 +960,19 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
                   {isRedirecting 
                     ? 'Opening Destination...' 
                     : isFaucetStepReady 
-                    ? currentFaucetStep < faucetTotalSteps 
-                      ? 'Continue ➔' 
-                      : 'Get Link ➔' 
+                    ? currentFaucetStep === faucetTotalSteps && currentFaucetPage === faucetPagesPerStep
+                      ? 'Get Link ➔'
+                      : currentFaucetPage < faucetPagesPerStep
+                      ? `Continue (Page ${currentFaucetPage}/${faucetPagesPerStep}) ➔`
+                      : `Next Step (Step ${currentFaucetStep + 1}/${faucetTotalSteps}) ➔`
                     : !faucetTimerDone 
                     ? `Please wait ${faucetTimer}s...`
                     : `Click 1 Banner Ad Above...`}
                 </span>
               </button>
 
-              <span className="text-slate-400 text-xs mt-3 block">
-                Step {currentFaucetStep}/{faucetTotalSteps} — Direct Step (No Shortlink)
+              <span className="text-slate-400 text-xs mt-3 block font-mono">
+                Step {currentFaucetStep}/{faucetTotalSteps} • Page {currentFaucetPage}/{faucetPagesPerStep} (Overall Click {currentOverallClickIndex}/{totalPagesAcrossSteps})
               </span>
             </div>
 

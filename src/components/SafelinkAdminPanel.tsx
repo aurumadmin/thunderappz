@@ -83,6 +83,7 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
     // Faucet Traffic Mode Configuration
     enableFaucetMode: config.safelinkConfig?.enableFaucetMode ?? true,
     faucetStepsCount: config.safelinkConfig?.faucetStepsCount ?? 3,
+    faucetPagesPerStep: config.safelinkConfig?.faucetPagesPerStep ?? 3,
     faucetStepTimer: config.safelinkConfig?.faucetStepTimer ?? 10,
     faucetClicksRequiredPerStep: config.safelinkConfig?.faucetClicksRequiredPerStep ?? 1,
     faucetDestinationUrl: config.safelinkConfig?.faucetDestinationUrl || 'https://thunder-appz.eu.org/',
@@ -1225,10 +1226,10 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
               </label>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-amber-300 mb-2">
-                  Number of Steps for Faucet Traffic
+                  Number of Steps for Faucet
                 </label>
                 <input
                   type="number"
@@ -1240,12 +1241,29 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
                   }
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 font-bold focus:outline-none focus:border-amber-500 text-sm"
                 />
-                <p className="text-[11px] text-slate-400 mt-1.5">Default: 3 steps (e.g. Step 1/3, Step 2/3, Step 3/3).</p>
+                <p className="text-[11px] text-slate-400 mt-1.5">Main Steps (e.g. 3 Steps).</p>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-amber-300 mb-2">
-                  Step Timer (Seconds per Step)
+                  Pages Per Step (Sub-Clicks)
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={formConfig.faucetPagesPerStep ?? 3}
+                  onChange={(e) =>
+                    setFormConfig({ ...formConfig, faucetPagesPerStep: Math.max(1, parseInt(e.target.value) || 1) })
+                  }
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 font-bold focus:outline-none focus:border-amber-500 text-sm"
+                />
+                <p className="text-[11px] text-slate-400 mt-1.5">Pages/clicks before advancing step (e.g. 3 pages/step).</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-amber-300 mb-2">
+                  Page Timer (Seconds per Page)
                 </label>
                 <input
                   type="number"
@@ -1257,12 +1275,12 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
                   }
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 font-bold focus:outline-none focus:border-amber-500 text-sm"
                 />
-                <p className="text-[11px] text-slate-400 mt-1.5">Countdown required before Continue button unlocks.</p>
+                <p className="text-[11px] text-slate-400 mt-1.5">Timer per page reload.</p>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-amber-300 mb-2">
-                  Required Ad Clicks per Step
+                  Required Ad Clicks per Page
                 </label>
                 <input
                   type="number"
@@ -1274,7 +1292,7 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
                   }
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 font-bold focus:outline-none focus:border-amber-500 text-sm"
                 />
-                <p className="text-[11px] text-slate-400 mt-1.5">Clicks required on banner ads per step (0 to disable).</p>
+                <p className="text-[11px] text-slate-400 mt-1.5">Banner clicks per page (0 = disable).</p>
               </div>
             </div>
 
@@ -1331,20 +1349,20 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
                 Faucet URL Generator & Tester
               </h4>
               <p className="text-xs text-slate-300 mb-4">
-                Use this link pattern on your Faucet / Shortlink micro-tasks. Users clicking this link will enter the {formConfig.faucetStepsCount || 3}-step refresh sequence.
+                Use this link pattern on your Faucet / Shortlink micro-tasks. Users clicking this link will perform {formConfig.faucetPagesPerStep || 3} page reloads per step across {formConfig.faucetStepsCount || 3} main steps (total {(formConfig.faucetStepsCount || 3) * (formConfig.faucetPagesPerStep || 3)} total page ad impressions).
               </p>
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <input
                   type="text"
                   readOnly
-                  value={`${window.location.origin}/faucet/?url=${encodeURIComponent(formConfig.faucetDestinationUrl || 'https://thunder-appz.eu.org/')}&step=1&total=${formConfig.faucetStepsCount || 3}`}
+                  value={`${window.location.origin}/faucet/?url=${encodeURIComponent(formConfig.faucetDestinationUrl || 'https://thunder-appz.eu.org/')}&step=1&page=1&total_steps=${formConfig.faucetStepsCount || 3}&pages_per_step=${formConfig.faucetPagesPerStep || 3}`}
                   className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-xs text-amber-300 font-mono focus:outline-none select-all"
                 />
                 <button
                   type="button"
                   onClick={() => {
-                    const testUrl = `${window.location.origin}/faucet/?url=${encodeURIComponent(formConfig.faucetDestinationUrl || 'https://thunder-appz.eu.org/')}&step=1&total=${formConfig.faucetStepsCount || 3}`;
+                    const testUrl = `${window.location.origin}/faucet/?url=${encodeURIComponent(formConfig.faucetDestinationUrl || 'https://thunder-appz.eu.org/')}&step=1&page=1&total_steps=${formConfig.faucetStepsCount || 3}&pages_per_step=${formConfig.faucetPagesPerStep || 3}`;
                     navigator.clipboard.writeText(testUrl);
                     alert('Faucet Test Link copied to clipboard!');
                   }}
@@ -1354,7 +1372,7 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
                   Copy Faucet Link
                 </button>
                 <a
-                  href={`/faucet/?url=${encodeURIComponent(formConfig.faucetDestinationUrl || 'https://thunder-appz.eu.org/')}&step=1&total=${formConfig.faucetStepsCount || 3}`}
+                  href={`/faucet/?url=${encodeURIComponent(formConfig.faucetDestinationUrl || 'https://thunder-appz.eu.org/')}&step=1&page=1&total_steps=${formConfig.faucetStepsCount || 3}&pages_per_step=${formConfig.faucetPagesPerStep || 3}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold text-xs rounded-xl transition-all shrink-0 cursor-pointer flex items-center justify-center gap-2 border border-slate-700"

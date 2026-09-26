@@ -90,6 +90,7 @@ export interface SafelinkAdminConfig {
   // Faucet Traffic Mode Configuration
   enableFaucetMode?: boolean;
   faucetStepsCount?: number;
+  faucetPagesPerStep?: number;
   faucetStepTimer?: number;
   faucetClicksRequiredPerStep?: number;
   faucetDestinationUrl?: string;
