@@ -907,7 +907,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
                   code={safelinkCfg.middleBanner || safelinkCfg.aboveTimerBanner || config.inPostAdCode}
                   slotId="faucet-middle-ad"
                   label="In-Step Banner Ad"
-                  adSize={safelinkCfg.aboveTimerBannerSize || '300x250'}
+                  adSize="468x60"
                   showPlaceholder={false}
                   onAdClicked={() => handleAdSlotClicked('faucet-middle-ad')}
                   isClickTrackingActive={isClickGateEnabled}
