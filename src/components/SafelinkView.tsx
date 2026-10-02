@@ -820,10 +820,10 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
               </p>
             </div>
 
-            {/* Warning Notice Banner for Faucet Pages */}
-            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 text-xs font-bold tracking-wide text-amber-300 flex items-center justify-center gap-2 shadow-sm text-center">
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
-              <span>YOU WILL BE REDIRECTED TO SHORTXLINKS BEFORE GETTING THE FINAL LINK.</span>
+            {/* Notice Banner for Faucet Pages */}
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-3.5 text-xs font-bold tracking-wide text-blue-300 flex items-center justify-center gap-2 shadow-sm text-center">
+              <Sparkles className="w-4 h-4 text-blue-400 shrink-0 animate-pulse" />
+              <span>There is no shortlink on this Faucet Plan. Just complete the steps to continue</span>
             </div>
 
             {/* Step Milestone Badges (Matching Screenshot 2) */}
