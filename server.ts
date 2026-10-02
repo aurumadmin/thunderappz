@@ -209,6 +209,108 @@ async function startServer() {
     }
   });
 
+  // =========================================================================
+  // PUBLIC VERIFICATION FILES MANAGER API ENDPOINTS
+  // =========================================================================
+
+  // List all files in /public/
+  app.get("/api/public-files", (req, res) => {
+    try {
+      const publicDir = path.join(process.cwd(), "public");
+      if (!fs.existsSync(publicDir)) {
+        fs.mkdirSync(publicDir, { recursive: true });
+      }
+
+      const files = fs.readdirSync(publicDir);
+      const publicFileList = files
+        .filter((f) => !f.startsWith("."))
+        .map((filename) => {
+          const filePath = path.join(publicDir, filename);
+          let content = "";
+          try {
+            const stats = fs.statSync(filePath);
+            if (stats.isFile() && stats.size < 500000) {
+              content = fs.readFileSync(filePath, "utf-8");
+            }
+          } catch (e) {}
+          return {
+            filename,
+            content,
+            url: `/${filename}`
+          };
+        });
+
+      res.json({ status: "success", files: publicFileList });
+    } catch (err: any) {
+      res.status(500).json({ status: "error", message: err?.message || "Failed to list public files" });
+    }
+  });
+
+  // Upload / Edit a file in /public/
+  app.post("/api/public-file", (req, res) => {
+    try {
+      const { filename, content } = req.body || {};
+      if (!filename || typeof filename !== "string") {
+        return res.status(400).json({ status: "error", message: "Filename is required" });
+      }
+
+      const safeFilename = path.basename(filename.trim());
+      if (!safeFilename) {
+        return res.status(400).json({ status: "error", message: "Invalid filename" });
+      }
+
+      const publicDir = path.join(process.cwd(), "public");
+      if (!fs.existsSync(publicDir)) {
+        fs.mkdirSync(publicDir, { recursive: true });
+      }
+
+      const targetPath = path.join(publicDir, safeFilename);
+      fs.writeFileSync(targetPath, content || "", "utf-8");
+
+      // Also sync to dist/ if dist directory exists
+      const distDir = path.join(process.cwd(), "dist");
+      if (fs.existsSync(distDir)) {
+        const distPath = path.join(distDir, safeFilename);
+        fs.writeFileSync(distPath, content || "", "utf-8");
+      }
+
+      res.json({
+        status: "success",
+        filename: safeFilename,
+        url: `/${safeFilename}`,
+        message: `File /${safeFilename} successfully created/updated in /public!`
+      });
+    } catch (err: any) {
+      console.error("Error writing public file:", err);
+      res.status(500).json({ status: "error", message: err?.message || "Failed to save file to public" });
+    }
+  });
+
+  // Delete a file from /public/
+  app.delete("/api/public-file/:filename", (req, res) => {
+    try {
+      const filename = req.params.filename;
+      if (!filename) {
+        return res.status(400).json({ status: "error", message: "Filename is required" });
+      }
+
+      const safeFilename = path.basename(filename.trim());
+      const publicPath = path.join(process.cwd(), "public", safeFilename);
+      if (fs.existsSync(publicPath)) {
+        fs.unlinkSync(publicPath);
+      }
+
+      const distPath = path.join(process.cwd(), "dist", safeFilename);
+      if (fs.existsSync(distPath)) {
+        fs.unlinkSync(distPath);
+      }
+
+      res.json({ status: "success", message: `File /${safeFilename} deleted successfully` });
+    } catch (err: any) {
+      res.status(500).json({ status: "error", message: err?.message || "Failed to delete file" });
+    }
+  });
+
   // DL.surf API Proxy Endpoints to bypass browser CORS constraints
   app.get("/api/dlsurf/creator/:username", async (req, res) => {
     try {
@@ -635,6 +737,30 @@ async function startServer() {
       console.error("Error generating sitemap.xml:", err);
       res.status(500).send("Error generating sitemap");
     }
+  });
+
+  // Dynamic route handler for ANY custom verification file in /public/
+  app.get("/:filename", (req, res, next) => {
+    const filename = req.params.filename;
+    if (!filename || filename.startsWith("api") || ["faucet", "safelink", "go", "post", "assets"].includes(filename)) {
+      return next();
+    }
+    const safeFilename = path.basename(filename.trim());
+    const publicFilePath = path.join(process.cwd(), "public", safeFilename);
+    if (fs.existsSync(publicFilePath) && fs.statSync(publicFilePath).isFile()) {
+      if (safeFilename.endsWith(".html")) {
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+      } else if (safeFilename.endsWith(".json")) {
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+      } else if (safeFilename.endsWith(".xml")) {
+        res.setHeader("Content-Type", "application/xml; charset=utf-8");
+      } else {
+        res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      }
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      return res.status(200).sendFile(publicFilePath);
+    }
+    next();
   });
 
   // Helper to inject saved head code and site name into HTML template

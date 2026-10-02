@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { BlogConfig, BLOG_CATEGORIES, getPostCategories } from '../types';
 import { DlSurfPost } from '../lib/dlsurfApi';
 import { 
-  Shield, FileText, Settings, Save, LogOut, Check, ArrowLeft, Download, Copy, Tag, X, Search, RefreshCw, Layers, CheckSquare, Square
+  Shield, FileText, Settings, Save, LogOut, Check, ArrowLeft, Download, Copy, Tag, X, Search, RefreshCw, Layers, CheckSquare, Square,
+  FolderPlus, Trash2, ExternalLink, Globe, FileCode
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -27,8 +28,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Tab State: 'settings' | 'categories'
-  const [activeTab, setActiveTab] = useState<'settings' | 'categories'>('categories');
+  // Tab State: 'settings' | 'categories' | 'publicFiles'
+  const [activeTab, setActiveTab] = useState<'settings' | 'categories' | 'publicFiles'>('categories');
+
+  // Public Verification Files Manager State
+  const [publicFiles, setPublicFiles] = useState<Array<{ filename: string; content: string; url: string }>>([]);
+  const [newFilename, setNewFilename] = useState('');
+  const [newFileContent, setNewFileContent] = useState('');
+  const [fileStatusMsg, setFileStatusMsg] = useState('');
+  const [isLoadingPublicFiles, setIsLoadingPublicFiles] = useState(false);
 
   // Local Config States
   const [username, setUsername] = useState(config.username || 'thunderbolt');
@@ -73,6 +81,78 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setInPostAdCode(config.inPostAdCode || '');
     setDlCategoryMap(config.dlCategoryMap || {});
   }, [config]);
+
+  const fetchPublicFiles = async () => {
+    setIsLoadingPublicFiles(true);
+    try {
+      const res = await fetch('/api/public-files');
+      const data = await res.json();
+      if (data.status === 'success' && Array.isArray(data.files)) {
+        setPublicFiles(data.files);
+      }
+    } catch (e) {
+      console.error('Failed to fetch public files:', e);
+    } finally {
+      setIsLoadingPublicFiles(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchPublicFiles();
+    }
+  }, [isLoggedIn]);
+
+  const handleSavePublicFile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFilename.trim()) {
+      alert('Please enter a filename (e.g. adnetwork_verify.html or verification.txt)');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/public-file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: newFilename.trim(),
+          content: newFileContent
+        })
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        setFileStatusMsg(`✓ File /${data.filename} successfully created/updated in /public!`);
+        setTimeout(() => setFileStatusMsg(''), 4000);
+        setNewFilename('');
+        setNewFileContent('');
+        fetchPublicFiles();
+      } else {
+        alert(data.message || 'Failed to save public file');
+      }
+    } catch (err) {
+      alert('Network error while saving file');
+    }
+  };
+
+  const handleDeletePublicFile = async (filename: string) => {
+    if (!confirm(`Are you sure you want to delete /public/${filename}?`)) return;
+
+    try {
+      const res = await fetch(`/api/public-file/${encodeURIComponent(filename)}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        setFileStatusMsg(`✓ File /${filename} deleted.`);
+        setTimeout(() => setFileStatusMsg(''), 4000);
+        fetchPublicFiles();
+      } else {
+        alert(data.message || 'Failed to delete file');
+      }
+    } catch (err) {
+      alert('Network error while deleting file');
+    }
+  };
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -424,6 +504,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             >
               <Settings className="w-4 h-4" />
               <span>General Settings & Ads</span>
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('publicFiles');
+                fetchPublicFiles();
+              }}
+              className={`flex items-center space-x-1.5 py-3 px-5 border-b-2 font-medium text-xs uppercase tracking-wider font-mono transition-colors cursor-pointer ${
+                activeTab === 'publicFiles'
+                  ? 'border-rose-600 text-rose-600'
+                  : 'border-transparent text-neutral-500 hover:text-neutral-800 dark:hover:text-white'
+              }`}
+            >
+              <Globe className="w-4 h-4 text-rose-500" />
+              <span>Public Verification Files (/public)</span>
             </button>
           </div>
 
@@ -936,6 +1030,157 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </button>
               </div>
             </form>
+          )}
+
+          {/* TAB 3: PUBLIC VERIFICATION FILES MANAGER */}
+          {activeTab === 'publicFiles' && (
+            <div className="space-y-6">
+              <div className="bg-white dark:bg-neutral-900 p-6 rounded-xl border border-neutral-200 dark:border-neutral-800 space-y-6 shadow-sm">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b pb-4 border-neutral-100 dark:border-neutral-800 gap-3">
+                  <div>
+                    <h3 className="font-serif font-bold text-lg text-neutral-900 dark:text-white flex items-center gap-2">
+                      <Globe className="w-5 h-5 text-rose-600" />
+                      Public Site Verification Files Manager (/public)
+                    </h3>
+                    <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                      Add custom verification HTML or TXT files directly to the root directory (<code className="text-rose-500 font-mono">/public</code>) so ad networks (Adsterra, Kadam, Monetag, Google Search Console, etc.) can instantly verify your domain.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={fetchPublicFiles}
+                    className="px-3.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-900 text-white text-xs font-mono font-bold flex items-center space-x-1.5 cursor-pointer shrink-0"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isLoadingPublicFiles ? 'animate-spin text-rose-400' : ''}`} />
+                    <span>Refresh List</span>
+                  </button>
+                </div>
+
+                {fileStatusMsg && (
+                  <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold font-mono">
+                    {fileStatusMsg}
+                  </div>
+                )}
+
+                {/* Create or Edit Public File Form */}
+                <form onSubmit={handleSavePublicFile} className="space-y-4 bg-neutral-50 dark:bg-neutral-950 p-5 rounded-xl border border-neutral-200 dark:border-neutral-800">
+                  <h4 className="text-xs uppercase tracking-wider font-bold font-mono text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5">
+                    <FolderPlus className="w-4 h-4 text-rose-500" />
+                    Upload / Create Verification File
+                  </h4>
+
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider font-semibold font-mono text-neutral-500 dark:text-neutral-400 mb-1">
+                      Filename (e.g. <code className="text-rose-500 font-bold">kadam_verify.html</code> or <code className="text-rose-500 font-bold">adnetwork.txt</code>)
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs font-mono text-neutral-500 dark:text-neutral-400 font-bold px-3 py-2 bg-neutral-200 dark:bg-neutral-800 rounded-lg shrink-0">
+                        /
+                      </span>
+                      <input
+                        type="text"
+                        required
+                        value={newFilename}
+                        onChange={(e) => setNewFilename(e.target.value)}
+                        placeholder="my_verification_file.html"
+                        className="px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs font-mono text-neutral-900 dark:text-white flex-1 focus:outline-none focus:border-rose-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs uppercase tracking-wider font-semibold font-mono text-neutral-500 dark:text-neutral-400 mb-1">
+                      File Content (HTML / Text verification string)
+                    </label>
+                    <textarea
+                      rows={4}
+                      value={newFileContent}
+                      onChange={(e) => setNewFileContent(e.target.value)}
+                      placeholder="Paste your ad network verification code, string, or HTML body content here..."
+                      className="w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs font-mono text-neutral-900 dark:text-white focus:outline-none focus:border-rose-500"
+                    />
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold font-mono flex items-center space-x-2 transition-all shadow-md cursor-pointer"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>Save File to Public (/)</span>
+                    </button>
+                  </div>
+                </form>
+
+                {/* List of Files in /public */}
+                <div className="space-y-3 pt-2">
+                  <h4 className="text-xs uppercase tracking-wider font-bold font-mono text-neutral-700 dark:text-neutral-300">
+                    Existing Verification Files in /public ({publicFiles.length})
+                  </h4>
+
+                  {publicFiles.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-neutral-400 font-mono bg-neutral-50 dark:bg-neutral-950 rounded-xl border border-neutral-200 dark:border-neutral-800">
+                      No files in /public directory yet. Use the form above to add one.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-3">
+                      {publicFiles.map((file) => (
+                        <div 
+                          key={file.filename}
+                          className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                        >
+                          <div className="space-y-1 overflow-hidden max-w-xl">
+                            <div className="flex items-center space-x-2">
+                              <FileCode className="w-4 h-4 text-rose-500 shrink-0" />
+                              <span className="font-mono text-xs font-bold text-neutral-900 dark:text-white truncate">
+                                /{file.filename}
+                              </span>
+                              <a
+                                href={file.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-2 py-0.5 text-[10px] font-mono font-bold rounded bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/20 transition-colors flex items-center space-x-1 shrink-0"
+                              >
+                                <span>Test Link</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                            {file.content && (
+                              <p className="text-[11px] font-mono text-neutral-500 dark:text-neutral-400 truncate max-w-lg bg-neutral-50 dark:bg-neutral-900 px-2 py-1 rounded border border-neutral-200/60 dark:border-neutral-800">
+                                {file.content.slice(0, 100)}{file.content.length > 100 ? '...' : ''}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex items-center space-x-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNewFilename(file.filename);
+                                setNewFileContent(file.content);
+                                window.scrollTo({ top: 300, behavior: 'smooth' });
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-xs font-mono font-bold text-neutral-700 dark:text-neutral-200 transition-colors cursor-pointer"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePublicFile(file.filename)}
+                              className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 transition-colors cursor-pointer"
+                              title="Delete file"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </div>
           )}
         </div>
       )}
