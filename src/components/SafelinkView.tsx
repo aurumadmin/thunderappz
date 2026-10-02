@@ -6,7 +6,7 @@ import {
   ExternalLink, Sparkles, RefreshCw, Eye, 
   Zap, Award, ChevronDown, Check, Layers,
   Shield, Key, Server, Cpu, Activity, Globe, ArrowDown,
-  MousePointerClick
+  MousePointerClick, AlertTriangle
 } from 'lucide-react';
 
 interface SafelinkViewProps {
@@ -810,7 +810,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
             {/* Header Subtitle & Title */}
             <div>
               <span className="text-xs font-bold uppercase tracking-widest text-slate-400 font-mono">
-                Step {currentFaucetStep}/{faucetTotalSteps} — Click {currentOverallClickIndex}/{totalPagesAcrossSteps}
+                Step {currentFaucetStep}/{faucetTotalSteps}
               </span>
               <h2 className="text-3xl font-extrabold text-white tracking-tight mt-1">
                 {safelinkCfg.faucetHeadingTitle || 'Continue'}
@@ -818,6 +818,12 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
               <p className="text-sm text-slate-300 max-w-md mx-auto mt-2 leading-relaxed">
                 {safelinkCfg.faucetStepMessage || 'There is no shortlink on this step. Simply click Continue once the timer finishes to proceed.'}
               </p>
+            </div>
+
+            {/* Warning Notice Banner for Faucet Pages */}
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 text-xs font-bold tracking-wide text-amber-300 flex items-center justify-center gap-2 shadow-sm text-center">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
+              <span>YOU WILL BE REDIRECTED TO SHORTXLINKS BEFORE GETTING THE FINAL LINK.</span>
             </div>
 
             {/* Step Milestone Badges (Matching Screenshot 2) */}
@@ -852,7 +858,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
                 <span className="w-4 h-4 rounded-full bg-white/20 text-[10px] flex items-center justify-center font-bold">
                   {currentFaucetStep}
                 </span>
-                <span>Click Continue ({currentFaucetPage}/{faucetPagesPerStep})</span>
+                <span>Click Continue</span>
               </div>
 
               <span className="text-slate-600">➔</span>
@@ -874,7 +880,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
             <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-4 text-left space-y-2">
               <div className="flex items-center justify-between text-xs font-semibold">
                 <span className="text-slate-200">
-                  Step Progress (Click {currentOverallClickIndex}/{totalPagesAcrossSteps})
+                  Step Progress
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[11px] font-bold">
                   {isFaucetStepReady && currentOverallClickIndex === totalPagesAcrossSteps
@@ -963,8 +969,8 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
                     ? currentFaucetStep === faucetTotalSteps && currentFaucetPage === faucetPagesPerStep
                       ? 'Get Link ➔'
                       : currentFaucetPage < faucetPagesPerStep
-                      ? `Continue (Page ${currentFaucetPage}/${faucetPagesPerStep}) ➔`
-                      : `Next Step (Step ${currentFaucetStep + 1}/${faucetTotalSteps}) ➔`
+                      ? 'Continue ➔'
+                      : `Next Step ➔`
                     : !faucetTimerDone 
                     ? `Please wait ${faucetTimer}s...`
                     : `Click 1 Banner Ad Above...`}
@@ -972,7 +978,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
               </button>
 
               <span className="text-slate-400 text-xs mt-3 block font-mono">
-                Step {currentFaucetStep}/{faucetTotalSteps} • Page {currentFaucetPage}/{faucetPagesPerStep} (Overall Click {currentOverallClickIndex}/{totalPagesAcrossSteps})
+                Step {currentFaucetStep}/{faucetTotalSteps} — Direct Step (No Shortlink)
               </span>
             </div>
 
