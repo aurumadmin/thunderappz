@@ -609,6 +609,19 @@ async function startServer() {
     res.status(200).send("Verification code: fjriMMFNHggl\nDomain: thunder-appz.eu.org\n");
   });
 
+  // Serve Kadam verification file (kadamd5f4c7b55fcd2f291a466ca65bce8c0a)
+  app.get(["/kadamd5f4c7b55fcd2f291a466ca65bce8c0a", "/kadamd5f4c7b55fcd2f291a466ca65bce8c0a.html", "/kadamd5f4c7b55fcd2f291a466ca65bce8c0a.txt"], (req, res) => {
+    const filePath = path.join(process.cwd(), "public", "kadamd5f4c7b55fcd2f291a466ca65bce8c0a");
+    if (fs.existsSync(filePath)) {
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      return res.status(200).sendFile(filePath);
+    }
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.status(200).send("kadamd5f4c7b55fcd2f291a466ca65bce8c0a");
+  });
+
   // Serve sitemap.xml dynamically for Google Search Console and crawlers
   app.get("/sitemap.xml", (req, res) => {
     try {
