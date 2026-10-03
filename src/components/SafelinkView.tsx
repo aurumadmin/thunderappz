@@ -808,10 +808,18 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
           <div className="max-w-2xl mx-auto bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-md text-center space-y-6 relative overflow-hidden">
             
             {/* Header Subtitle & Title */}
-            <div>
-              <span className="text-xs font-bold uppercase tracking-widest text-slate-400 font-mono">
-                Step {currentFaucetStep}/{faucetTotalSteps}
-              </span>
+            <div className="space-y-2">
+              <div className="flex items-center justify-center gap-2 flex-wrap">
+                <span className="px-3 py-1 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 text-xs font-bold font-mono">
+                  Step {currentFaucetStep} of {faucetTotalSteps}
+                </span>
+                <span className="px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs font-bold font-mono">
+                  Page {currentFaucetPage} of {faucetPagesPerStep}
+                </span>
+                <span className="px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 text-xs font-bold font-mono">
+                  Overall Page {currentOverallClickIndex} of {totalPagesAcrossSteps}
+                </span>
+              </div>
               <h2 className="text-3xl font-extrabold text-white tracking-tight mt-1">
                 {safelinkCfg.faucetHeadingTitle || 'Continue'}
               </h2>
@@ -821,9 +829,11 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
             </div>
 
             {/* Notice Banner for Faucet Pages */}
-            <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-3.5 text-xs font-bold tracking-wide text-blue-300 flex items-center justify-center gap-2 shadow-sm text-center">
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-3.5 text-xs font-bold tracking-wide text-blue-300 flex items-center justify-center gap-2 shadow-sm text-center flex-wrap">
               <Sparkles className="w-4 h-4 text-blue-400 shrink-0 animate-pulse" />
-              <span>There is no shortlink on this Faucet Plan. Just complete the steps to continue</span>
+              <span>
+                You are on <strong>Page {currentFaucetPage} of {faucetPagesPerStep}</strong> (Step {currentFaucetStep} of {faucetTotalSteps}). There is no shortlink on this Faucet Plan. Just complete the steps to continue
+              </span>
             </div>
 
             {/* Step Milestone Badges (Matching Screenshot 2) */}
@@ -879,13 +889,13 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
             {/* Progress Box (Matching Screenshot 2) */}
             <div className="bg-slate-950/60 border border-slate-800/80 rounded-2xl p-4 text-left space-y-2">
               <div className="flex items-center justify-between text-xs font-semibold">
-                <span className="text-slate-200">
-                  Step Progress
+                <span className="text-slate-200 font-mono">
+                  Step {currentFaucetStep}/{faucetTotalSteps} • Page {currentFaucetPage}/{faucetPagesPerStep}
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[11px] font-bold">
+                <span className="px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[11px] font-bold font-mono">
                   {isFaucetStepReady && currentOverallClickIndex === totalPagesAcrossSteps
                     ? 'Ready to Proceed • 100% Completed' 
-                    : `Getting Ready • ${Math.round(((currentOverallClickIndex - 1 + (faucetTimerDone ? 1 : 0)) / totalPagesAcrossSteps) * 100)}% Completed`}
+                    : `Page ${currentOverallClickIndex} of ${totalPagesAcrossSteps} • ${Math.round(((currentOverallClickIndex - 1 + (faucetTimerDone ? 1 : 0)) / totalPagesAcrossSteps) * 100)}%`}
                 </span>
               </div>
 
@@ -978,7 +988,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
               </button>
 
               <span className="text-slate-400 text-xs mt-3 block font-mono">
-                Step {currentFaucetStep}/{faucetTotalSteps} — Direct Step (No Shortlink)
+                Step {currentFaucetStep} of {faucetTotalSteps} — Page {currentFaucetPage} of {faucetPagesPerStep} (Overall Page {currentOverallClickIndex}/{totalPagesAcrossSteps})
               </span>
             </div>
 
