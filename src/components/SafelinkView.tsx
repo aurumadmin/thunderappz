@@ -164,9 +164,21 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
 
   // Destination URL resolution for Faucet Mode
   const getFaucetDestinationUrl = (): string => {
-    const urlParam = fullParams.get('url') || fullParams.get('link') || fullParams.get('dest') || fullParams.get('target');
-    if (urlParam) return urlParam;
+    const rawUrlParam = fullParams.get('url') || fullParams.get('link') || fullParams.get('dest') || fullParams.get('target');
+    
+    // 1. Check if an explicit external destination URL was provided that is NOT the blog domain itself and NOT a tglinks callback URL
+    if (
+      rawUrlParam && 
+      typeof rawUrlParam === 'string' &&
+      !rawUrlParam.includes('thunder-appz.eu.org') &&
+      !rawUrlParam.includes(window.location.host) &&
+      (rawUrlParam.startsWith('http://') || rawUrlParam.startsWith('https://')) &&
+      !rawUrlParam.includes('tglinks.eu.cc/p/')
+    ) {
+      return rawUrlParam;
+    }
 
+    // 2. Base64 encoded st_ URL
     if (code && code.startsWith('st_')) {
       try {
         const b64 = code.replace('st_', '');
@@ -179,7 +191,36 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
       }
     }
 
-    return safelinkCfg.faucetDestinationUrl || 'https://thunder-appz.eu.org/';
+    // 3. Check if safelinkCfg.faucetDestinationUrl is configured to a custom external target (and not the blog domain)
+    if (
+      safelinkCfg.faucetDestinationUrl && 
+      !safelinkCfg.faucetDestinationUrl.includes('thunder-appz.eu.org') &&
+      safelinkCfg.faucetDestinationUrl.startsWith('http') &&
+      !safelinkCfg.faucetDestinationUrl.includes('tglinks.eu.cc')
+    ) {
+      return safelinkCfg.faucetDestinationUrl;
+    }
+
+    // 4. Default: Redirect back to TG Links URL Shortener website handoff URL
+    // Format: https://tglinks.eu.cc/p/:code?token={token}&status=completed&sub_id={sub_id}
+    const targetCode = code && code.trim() ? code.trim() : 'demo';
+    const targetToken = token && token.trim() ? token.trim() : 'tg_token_demo';
+
+    const targetUrl = new URL(`https://tglinks.eu.cc/p/${encodeURIComponent(targetCode)}`);
+    targetUrl.searchParams.set('token', targetToken);
+    targetUrl.searchParams.set('status', 'completed');
+    if (subId) {
+      targetUrl.searchParams.set('sub_id', subId);
+    }
+
+    // Preserve any extra original search params except internal routing keys
+    fullParams.forEach((val, key) => {
+      if (!['code', 'c', 'token', 't', 'status', 'step', 'page', 'faucet', 'total_steps', 'pages_per_step', 'url', 'dest', 'link', 'target'].includes(key)) {
+        targetUrl.searchParams.set(key, val);
+      }
+    });
+
+    return targetUrl.toString();
   };
 
   const faucetRequiredClicks = safelinkCfg.faucetClicksRequiredPerStep !== undefined 

@@ -86,7 +86,7 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
     faucetPagesPerStep: config.safelinkConfig?.faucetPagesPerStep ?? 3,
     faucetStepTimer: config.safelinkConfig?.faucetStepTimer ?? 10,
     faucetClicksRequiredPerStep: config.safelinkConfig?.faucetClicksRequiredPerStep ?? 1,
-    faucetDestinationUrl: config.safelinkConfig?.faucetDestinationUrl || 'https://thunder-appz.eu.org/',
+    faucetDestinationUrl: config.safelinkConfig?.faucetDestinationUrl || 'https://tglinks.eu.cc/',
     faucetHeadingTitle: config.safelinkConfig?.faucetHeadingTitle || 'Continue',
     faucetStepMessage: config.safelinkConfig?.faucetStepMessage || 'There is no shortlink on this step. Simply click Continue once the timer finishes to proceed.',
     faucetButtonLabel: config.safelinkConfig?.faucetButtonLabel || 'Continue',
