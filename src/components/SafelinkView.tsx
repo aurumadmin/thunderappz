@@ -551,6 +551,39 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
     }
   };
 
+  // Dynamically inject custom Head Code into document.head when Safelink/Faucet mounts
+  useEffect(() => {
+    const rawHeadCode = safelinkCfg.headCode || config.headCode || '';
+    if (!rawHeadCode || !rawHeadCode.trim()) return;
+
+    const containerId = 'safelink-head-code-container';
+    let container = document.getElementById(containerId);
+    if (!container) {
+      container = document.createElement('div');
+      container.id = containerId;
+      document.head.appendChild(container);
+    }
+
+    // Insert meta tags / HTML tags
+    container.innerHTML = rawHeadCode;
+
+    // Execute scripts so dynamic external JS works
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(rawHeadCode, 'text/html');
+    const scripts = doc.querySelectorAll('script');
+
+    scripts.forEach((oldScript) => {
+      const newScript = document.createElement('script');
+      Array.from(oldScript.attributes).forEach((attr) => {
+        newScript.setAttribute(attr.name, attr.value);
+      });
+      if (oldScript.innerHTML) {
+        newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+      }
+      document.head.appendChild(newScript);
+    });
+  }, [safelinkCfg.headCode, config.headCode]);
+
   // Extract params on mount / route change
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);

@@ -37,6 +37,7 @@ export type AdSize =
 
 export interface SafelinkAdminConfig {
   adminPassword?: string;
+  headCode?: string;
   headerBanner?: string;
   headerBannerSize?: AdSize;
   footerBanner?: string;

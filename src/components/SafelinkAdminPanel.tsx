@@ -40,6 +40,7 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
 }) => {
   const currentSafelinkConfig: SafelinkAdminConfig = {
     adminPassword: config.safelinkConfig?.adminPassword || 'Thunderffyt123@',
+    headCode: config.safelinkConfig?.headCode || config.headCode || '',
     headerBanner: config.safelinkConfig?.headerBanner || '',
     footerBanner: config.safelinkConfig?.footerBanner || '',
     sidebarBanner: config.safelinkConfig?.sidebarBanner || '',
@@ -121,6 +122,7 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
   const handleSave = () => {
     onUpdateConfig({
       ...config,
+      headCode: formConfig.headCode !== undefined ? formConfig.headCode : config.headCode,
       safelinkConfig: formConfig,
     });
     setSavedSuccess(true);
@@ -413,6 +415,42 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
       {/* Tab 1: Banner & Popunder Ad Placements */}
       {activeTab === 'ads' && (
         <div className="space-y-6">
+
+          {/* Header Code / Custom <head> Option */}
+          <div className="bg-slate-900 border border-rose-500/30 rounded-2xl p-6 space-y-4 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                  <Code className="w-5 h-5 text-rose-400" />
+                  Header Code Option / Custom &lt;head&gt; Scripts
+                </h3>
+                <p className="text-xs text-slate-300 mt-1">
+                  Scripts and tags placed here are injected directly into the website's <code className="text-rose-400 font-mono">&lt;head&gt;</code> tag across Safelink, Faucet, and Blog pages.
+                </p>
+              </div>
+
+              <span className="text-[10px] font-mono font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-1 rounded-full shrink-0">
+                Global &lt;head&gt; Injection
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-400">
+              Ideal for Meta Tags (e.g. <code className="text-slate-200 font-mono">&lt;meta name="referrer" content="no-referrer-when-downgrade"/&gt;</code>), Cloudfront Scripts, Google Auto Ads, Popunder Tracking Scripts, and Network Verification tags.
+            </p>
+
+            <textarea
+              rows={6}
+              value={formConfig.headCode || ''}
+              onChange={(e) => setFormConfig({ ...formConfig, headCode: e.target.value })}
+              placeholder={`<!-- Paste your <head> code here. Example: -->\n<meta name="referrer" content="no-referrer-when-downgrade"/>\n<script data-cfasync="false" src="//dcbbwymp1bhlf.cloudfront.net/?wbbcd=1724341"></script>`}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-4 text-xs font-mono text-slate-200 focus:outline-none focus:border-rose-500 leading-relaxed"
+            />
+
+            <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl flex items-center gap-2 text-xs text-slate-400 font-mono">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>HTML &lt;head&gt; code automatically renders on initial server load and client page transitions.</span>
+            </div>
+          </div>
 
           {/* IAB Standard Ad Dimensions Guide Banner */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">

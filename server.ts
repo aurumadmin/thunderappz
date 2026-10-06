@@ -774,8 +774,9 @@ async function startServer() {
       if (cfg.siteName) {
         result = result.replace(/<title>.*?<\/title>/i, `<title>${cfg.siteName}</title>`);
       }
-      if (cfg.headCode && typeof cfg.headCode === "string" && cfg.headCode.trim()) {
-        result = result.replace('</head>', `${cfg.headCode}\n</head>`);
+      const headCodeToInject = cfg.safelinkConfig?.headCode || cfg.headCode;
+      if (headCodeToInject && typeof headCodeToInject === "string" && headCodeToInject.trim()) {
+        result = result.replace('</head>', `${headCodeToInject}\n</head>`);
       }
       return result;
     } catch (e) {
