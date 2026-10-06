@@ -564,31 +564,44 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
       document.head.appendChild(container);
     }
 
-    // Insert meta tags / HTML tags
-    container.innerHTML = rawHeadCode;
+    const createdNodes: Node[] = [container];
 
-    // Execute scripts so dynamic external JS works on ad step pages
+    // Parse HTML content safely
     const parser = new DOMParser();
     const doc = parser.parseFromString(rawHeadCode, 'text/html');
-    const scripts = doc.querySelectorAll('script');
 
-    const createdScripts: HTMLScriptElement[] = [];
+    // 1. Move non-script elements (meta tags, link, style) into head container
+    const nonScripts = doc.querySelectorAll('meta, link, style, base');
+    nonScripts.forEach((el) => {
+      const cloned = el.cloneNode(true);
+      container!.appendChild(cloned);
+    });
+
+    // 2. Execute scripts properly using new HTMLScriptElement instances
+    const scripts = doc.querySelectorAll('script');
     scripts.forEach((oldScript) => {
       const newScript = document.createElement('script');
       Array.from(oldScript.attributes).forEach((attr) => {
         newScript.setAttribute(attr.name, attr.value);
       });
       if (oldScript.innerHTML) {
-        newScript.appendChild(document.createTextNode(oldScript.innerHTML));
+        newScript.text = oldScript.innerHTML;
       }
       document.head.appendChild(newScript);
-      createdScripts.push(newScript);
+      createdNodes.push(newScript);
     });
 
     // Cleanup when leaving ad step pages
     return () => {
-      if (container) container.remove();
-      createdScripts.forEach((s) => s.remove());
+      createdNodes.forEach((node) => {
+        try {
+          if (node.parentNode) {
+            node.parentNode.removeChild(node);
+          }
+        } catch (e) {
+          // ignore cleanup errors
+        }
+      });
     };
   }, [safelinkCfg.headCode]);
 

@@ -424,12 +424,12 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
                   Header Code Option / Custom &lt;head&gt; Scripts
                 </h3>
                 <p className="text-xs text-slate-300 mt-1">
-                  Scripts and tags placed here are injected directly into the website's <code className="text-rose-400 font-mono">&lt;head&gt;</code> tag across Safelink, Faucet, and Blog pages.
+                  Scripts and tags placed here are injected directly into the website's <code className="text-rose-400 font-mono">&lt;head&gt;</code> tag exclusively on URL Shortener &amp; Faucet ad step pages (<code className="text-slate-300 font-mono">/go/*</code>, <code className="text-slate-300 font-mono">/safelink/*</code>, <code className="text-slate-300 font-mono">/faucet/*</code>).
                 </p>
               </div>
 
               <span className="text-[10px] font-mono font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20 px-3 py-1 rounded-full shrink-0">
-                Global &lt;head&gt; Injection
+                Ad Step Pages &lt;head&gt; Only
               </span>
             </div>
 
@@ -447,7 +447,7 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
 
             <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl flex items-center gap-2 text-xs text-slate-400 font-mono">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>HTML &lt;head&gt; code automatically renders on initial server load and client page transitions.</span>
+              <span>HTML &lt;head&gt; code automatically renders on initial server load and client transitions for shortener ad step pages only.</span>
             </div>
           </div>
 
