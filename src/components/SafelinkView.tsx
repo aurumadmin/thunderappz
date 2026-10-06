@@ -173,7 +173,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
       !rawUrlParam.includes('thunder-appz.eu.org') &&
       !rawUrlParam.includes(window.location.host) &&
       (rawUrlParam.startsWith('http://') || rawUrlParam.startsWith('https://')) &&
-      !rawUrlParam.includes('tglinks.eu.cc/p/')
+      !rawUrlParam.includes('tglinks.eu.cc')
     ) {
       return rawUrlParam;
     }
@@ -203,19 +203,26 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
 
     // 4. Default: Redirect back to TG Links URL Shortener website handoff URL
     // Format: https://tglinks.eu.cc/p/:code?token={token}&status=completed&sub_id={sub_id}
-    const targetCode = code && code.trim() ? code.trim() : 'demo';
-    const targetToken = token && token.trim() ? token.trim() : 'tg_token_demo';
+    const realCode = (code && code.trim() && code !== 'demo') 
+      ? code.trim() 
+      : (fullParams.get('code') || fullParams.get('c') || fullParams.get('go') || fullParams.get('alias') || 'phWVry');
+    
+    const realToken = (token && token.trim() && token !== 'tg_token_demo') 
+      ? token.trim() 
+      : (fullParams.get('token') || fullParams.get('t') || 'tg_token_demo');
 
-    const targetUrl = new URL(`https://tglinks.eu.cc/p/${encodeURIComponent(targetCode)}`);
-    targetUrl.searchParams.set('token', targetToken);
+    const realSubId = subId || fullParams.get('sub_id') || fullParams.get('subid') || realCode;
+
+    const targetUrl = new URL(`https://tglinks.eu.cc/p/${encodeURIComponent(realCode)}`);
+    targetUrl.searchParams.set('token', realToken);
     targetUrl.searchParams.set('status', 'completed');
-    if (subId) {
-      targetUrl.searchParams.set('sub_id', subId);
+    if (realSubId) {
+      targetUrl.searchParams.set('sub_id', realSubId);
     }
 
     // Preserve any extra original search params except internal routing keys
     fullParams.forEach((val, key) => {
-      if (!['code', 'c', 'token', 't', 'status', 'step', 'page', 'faucet', 'total_steps', 'pages_per_step', 'url', 'dest', 'link', 'target'].includes(key)) {
+      if (!['code', 'c', 'token', 't', 'status', 'step', 'page', 'faucet', 'total_steps', 'pages_per_step', 'url', 'dest', 'link', 'target', 'alias', 'alias_code', 'id', 'go'].includes(key)) {
         targetUrl.searchParams.set(key, val);
       }
     });
@@ -240,13 +247,25 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
     if (currentFaucetPage < faucetPagesPerStep) {
       const nextPage = currentFaucetPage + 1;
       const nextUrl = new URL(window.location.href);
-      nextUrl.pathname = '/faucet/';
+
+      if (code && code !== 'demo') {
+        nextUrl.searchParams.set('code', code);
+      }
+      if (token && token !== 'tg_token_demo') {
+        nextUrl.searchParams.set('token', token);
+      }
+      if (subId) {
+        nextUrl.searchParams.set('sub_id', subId);
+      }
+
       nextUrl.searchParams.set('faucet', '1');
       nextUrl.searchParams.set('step', String(currentFaucetStep));
       nextUrl.searchParams.set('page', String(nextPage));
       nextUrl.searchParams.set('total_steps', String(faucetTotalSteps));
       nextUrl.searchParams.set('pages_per_step', String(faucetPagesPerStep));
-      nextUrl.searchParams.set('url', targetDest);
+      if (targetDest) {
+        nextUrl.searchParams.set('url', targetDest);
+      }
 
       window.location.href = nextUrl.toString();
     } 
@@ -254,13 +273,25 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
     else if (currentFaucetStep < faucetTotalSteps) {
       const nextStep = currentFaucetStep + 1;
       const nextUrl = new URL(window.location.href);
-      nextUrl.pathname = '/faucet/';
+
+      if (code && code !== 'demo') {
+        nextUrl.searchParams.set('code', code);
+      }
+      if (token && token !== 'tg_token_demo') {
+        nextUrl.searchParams.set('token', token);
+      }
+      if (subId) {
+        nextUrl.searchParams.set('sub_id', subId);
+      }
+
       nextUrl.searchParams.set('faucet', '1');
       nextUrl.searchParams.set('step', String(nextStep));
       nextUrl.searchParams.set('page', '1');
       nextUrl.searchParams.set('total_steps', String(faucetTotalSteps));
       nextUrl.searchParams.set('pages_per_step', String(faucetPagesPerStep));
-      nextUrl.searchParams.set('url', targetDest);
+      if (targetDest) {
+        nextUrl.searchParams.set('url', targetDest);
+      }
 
       window.location.href = nextUrl.toString();
     } 
@@ -610,26 +641,40 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
     const searchParams = new URLSearchParams(window.location.search);
     setFullParams(searchParams);
 
-    // Extract code from path (e.g. /go/:code or /safelink/:code) or search params
-    let extractedCode = searchParams.get('code') || searchParams.get('c') || searchParams.get('go') || '';
+    // Extract code from query params or URL path
+    let extractedCode = searchParams.get('code') || 
+                        searchParams.get('c') || 
+                        searchParams.get('go') || 
+                        searchParams.get('alias') || 
+                        searchParams.get('alias_code') || 
+                        searchParams.get('id') || '';
+
     const path = window.location.pathname;
     if (!extractedCode) {
       if (path.startsWith('/go/')) {
-        extractedCode = path.replace('/go/', '').split('/')[0];
+        extractedCode = path.replace('/go/', '').split('/')[0].split('?')[0];
       } else if (path.startsWith('/safelink/')) {
-        extractedCode = path.replace('/safelink/', '').split('/')[0];
+        extractedCode = path.replace('/safelink/', '').split('/')[0].split('?')[0];
+      } else if (path.startsWith('/faucet/') && path !== '/faucet/' && path !== '/faucet') {
+        extractedCode = path.replace('/faucet/', '').split('/')[0].split('?')[0];
       }
     }
     
-    const finalCode = extractedCode.trim() || 'demo';
+    const finalCode = (extractedCode && extractedCode.trim()) ? extractedCode.trim() : 'demo';
     setCode(finalCode);
 
     // Extract token
-    const extractedToken = searchParams.get('token') || searchParams.get('t') || 'tg_token_demo';
+    const extractedToken = searchParams.get('token') || 
+                           searchParams.get('t') || 
+                           searchParams.get('tok') || 
+                           'tg_token_demo';
     setToken(extractedToken);
 
     // Extract sub_id
-    const extractedSubId = searchParams.get('sub_id') || searchParams.get('subid') || finalCode;
+    const extractedSubId = searchParams.get('sub_id') || 
+                           searchParams.get('subid') || 
+                           searchParams.get('sub_ID') || 
+                           (finalCode !== 'demo' ? finalCode : 'demo');
     setSubId(extractedSubId);
 
     setCustomCodeInput(finalCode);
@@ -791,16 +836,26 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
 
     const doRedirect = () => {
       // TG Links handoff format: https://tglinks.eu.cc/p/:code?token={token}&status=completed
-      const targetUrl = new URL(`https://tglinks.eu.cc/p/${encodeURIComponent(code)}`);
-      targetUrl.searchParams.set('token', token);
+      const realCode = (code && code.trim() && code !== 'demo') 
+        ? code.trim() 
+        : (fullParams.get('code') || fullParams.get('c') || fullParams.get('go') || fullParams.get('alias') || 'phWVry');
+
+      const realToken = (token && token.trim() && token !== 'tg_token_demo') 
+        ? token.trim() 
+        : (fullParams.get('token') || fullParams.get('t') || 'tg_token_demo');
+
+      const realSubId = subId || fullParams.get('sub_id') || fullParams.get('subid') || realCode;
+
+      const targetUrl = new URL(`https://tglinks.eu.cc/p/${encodeURIComponent(realCode)}`);
+      targetUrl.searchParams.set('token', realToken);
       targetUrl.searchParams.set('status', 'completed');
-      if (subId) {
-        targetUrl.searchParams.set('sub_id', subId);
+      if (realSubId) {
+        targetUrl.searchParams.set('sub_id', realSubId);
       }
       
       // Preserve extra original search params
       fullParams.forEach((val, key) => {
-        if (!['code', 'c', 'token', 't', 'status'].includes(key)) {
+        if (!['code', 'c', 'token', 't', 'status', 'alias', 'alias_code', 'id', 'go'].includes(key)) {
           targetUrl.searchParams.set(key, val);
         }
       });
