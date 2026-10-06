@@ -775,12 +775,23 @@ async function startServer() {
         result = result.replace(/<title>.*?<\/title>/i, `<title>${cfg.siteName}</title>`);
       }
 
-      // Check if request is an ad step page for the URL shortener: (/go/*, /safelink/*, /faucet/*) but NOT /safelink/admin
       const pathname = requestUrl.split('?')[0];
+      const isAdminPage = pathname.includes('/admin') || pathname.includes('/safelink/admin');
+
+      // Admin pages MUST NEVER receive any ad code or headCode injection!
+      if (isAdminPage) {
+        return result;
+      }
+
+      // Check if request is strictly an ad step page for the URL shortener: (/go/*, /safelink/*, /faucet/*)
       const isAdStepPage = (
         pathname.startsWith('/go') ||
         pathname.startsWith('/faucet') ||
-        (pathname.startsWith('/safelink') && !pathname.startsWith('/safelink/admin'))
+        (pathname.startsWith('/safelink') && !pathname.startsWith('/safelink/admin')) ||
+        requestUrl.includes('faucet=') ||
+        requestUrl.includes('code=') ||
+        requestUrl.includes('safelink=') ||
+        requestUrl.includes('go=')
       );
 
       const safelinkHeadCode = cfg.safelinkConfig?.headCode;

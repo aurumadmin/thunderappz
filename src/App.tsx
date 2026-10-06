@@ -288,13 +288,16 @@ export default function App() {
     reloadDlSurfPosts();
   }, [reloadDlSurfPosts]);
 
-  // Inject Custom <head> code dynamically on mount/update
+  // Inject Custom <head> code dynamically on mount/update (EXCEPT on admin views)
   useEffect(() => {
-    const headCode = config.headCode || '';
     // Remove existing custom head elements
     const existing = document.querySelectorAll('[data-custom-head="true"]');
     existing.forEach(el => el.remove());
 
+    // STRICT: Never inject custom head scripts on Admin console or Safelink Admin pages!
+    if (currentView === 'admin' || currentView === 'safelinkAdmin') return;
+
+    const headCode = config.headCode || '';
     if (!headCode.trim()) return;
 
     try {
@@ -340,7 +343,7 @@ export default function App() {
     } catch (err) {
       console.error('Error parsing or injecting custom head code', err);
     }
-  }, [config.headCode]);
+  }, [config.headCode, currentView]);
 
   // Dynamically sync browser tab title with configuration site name
   useEffect(() => {

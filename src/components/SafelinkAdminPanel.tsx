@@ -40,7 +40,7 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
 }) => {
   const currentSafelinkConfig: SafelinkAdminConfig = {
     adminPassword: config.safelinkConfig?.adminPassword || 'Thunderffyt123@',
-    headCode: config.safelinkConfig?.headCode || config.headCode || '',
+    headCode: config.safelinkConfig?.headCode || '',
     headerBanner: config.safelinkConfig?.headerBanner || '',
     footerBanner: config.safelinkConfig?.footerBanner || '',
     sidebarBanner: config.safelinkConfig?.sidebarBanner || '',
