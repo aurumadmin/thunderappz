@@ -551,9 +551,9 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
     }
   };
 
-  // Dynamically inject custom Head Code into document.head when Safelink/Faucet mounts
+  // Dynamically inject custom Head Code into document.head ONLY when Safelink/Faucet ad step pages mount
   useEffect(() => {
-    const rawHeadCode = safelinkCfg.headCode || config.headCode || '';
+    const rawHeadCode = safelinkCfg.headCode || '';
     if (!rawHeadCode || !rawHeadCode.trim()) return;
 
     const containerId = 'safelink-head-code-container';
@@ -567,11 +567,12 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
     // Insert meta tags / HTML tags
     container.innerHTML = rawHeadCode;
 
-    // Execute scripts so dynamic external JS works
+    // Execute scripts so dynamic external JS works on ad step pages
     const parser = new DOMParser();
     const doc = parser.parseFromString(rawHeadCode, 'text/html');
     const scripts = doc.querySelectorAll('script');
 
+    const createdScripts: HTMLScriptElement[] = [];
     scripts.forEach((oldScript) => {
       const newScript = document.createElement('script');
       Array.from(oldScript.attributes).forEach((attr) => {
@@ -581,8 +582,15 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
         newScript.appendChild(document.createTextNode(oldScript.innerHTML));
       }
       document.head.appendChild(newScript);
+      createdScripts.push(newScript);
     });
-  }, [safelinkCfg.headCode, config.headCode]);
+
+    // Cleanup when leaving ad step pages
+    return () => {
+      if (container) container.remove();
+      createdScripts.forEach((s) => s.remove());
+    };
+  }, [safelinkCfg.headCode]);
 
   // Extract params on mount / route change
   useEffect(() => {

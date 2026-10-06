@@ -764,7 +764,7 @@ async function startServer() {
   });
 
   // Helper to inject saved head code and site name into HTML template
-  const injectSavedConfigToHtml = (html: string): string => {
+  const injectSavedConfigToHtml = (html: string, requestUrl: string = '/'): string => {
     try {
       const siteData = loadSavedSiteData();
       const cfg = siteData?.config;
@@ -774,10 +774,22 @@ async function startServer() {
       if (cfg.siteName) {
         result = result.replace(/<title>.*?<\/title>/i, `<title>${cfg.siteName}</title>`);
       }
-      const headCodeToInject = cfg.safelinkConfig?.headCode || cfg.headCode;
-      if (headCodeToInject && typeof headCodeToInject === "string" && headCodeToInject.trim()) {
-        result = result.replace('</head>', `${headCodeToInject}\n</head>`);
+
+      // Check if request is an ad step page for the URL shortener: (/go/*, /safelink/*, /faucet/*) but NOT /safelink/admin
+      const pathname = requestUrl.split('?')[0];
+      const isAdStepPage = (
+        pathname.startsWith('/go') ||
+        pathname.startsWith('/faucet') ||
+        (pathname.startsWith('/safelink') && !pathname.startsWith('/safelink/admin'))
+      );
+
+      const safelinkHeadCode = cfg.safelinkConfig?.headCode;
+      if (isAdStepPage && safelinkHeadCode && typeof safelinkHeadCode === "string" && safelinkHeadCode.trim()) {
+        result = result.replace('</head>', `${safelinkHeadCode}\n</head>`);
+      } else if (!isAdStepPage && cfg.headCode && typeof cfg.headCode === "string" && cfg.headCode.trim()) {
+        result = result.replace('</head>', `${cfg.headCode}\n</head>`);
       }
+
       return result;
     } catch (e) {
       console.error("Error injecting saved config to HTML:", e);
@@ -802,7 +814,7 @@ async function startServer() {
         const indexPath = path.resolve(process.cwd(), 'index.html');
         let template = fs.readFileSync(indexPath, 'utf-8');
         template = await vite.transformIndexHtml(req.originalUrl, template);
-        template = injectSavedConfigToHtml(template);
+        template = injectSavedConfigToHtml(template, req.originalUrl);
         res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
       } catch (e) {
         vite.ssrFixStacktrace(e as Error);
@@ -820,7 +832,7 @@ async function startServer() {
         const indexPath = path.join(distPath, 'index.html');
         if (fs.existsSync(indexPath)) {
           let template = fs.readFileSync(indexPath, 'utf-8');
-          template = injectSavedConfigToHtml(template);
+          template = injectSavedConfigToHtml(template, req.originalUrl);
           return res.status(200).set({ 'Content-Type': 'text/html' }).send(template);
         }
       } catch (e) {

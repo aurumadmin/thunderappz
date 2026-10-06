@@ -122,7 +122,6 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
   const handleSave = () => {
     onUpdateConfig({
       ...config,
-      headCode: formConfig.headCode !== undefined ? formConfig.headCode : config.headCode,
       safelinkConfig: formConfig,
     });
     setSavedSuccess(true);
