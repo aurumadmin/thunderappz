@@ -59,7 +59,7 @@ export const ZontalSidebar: React.FC<ZontalSidebarProps> = ({
   const visibleCategories = showMoreCategories ? categories : categories.slice(0, 8);
 
   return (
-    <aside className={`w-full lg:w-64 shrink-0 space-y-6 ${
+    <aside className={`hidden lg:block w-64 shrink-0 space-y-6 ${
       isDark ? 'text-slate-200' : 'text-slate-800'
     }`}>
       

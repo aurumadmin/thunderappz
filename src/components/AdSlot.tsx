@@ -8,6 +8,7 @@ interface AdSlotProps {
   adSize?: AdSize;
   className?: string;
   showPlaceholder?: boolean;
+  framed?: boolean;
   
   // Click-tracking props
   isClickTrackingActive?: boolean;
@@ -60,6 +61,7 @@ export const AdSlot: React.FC<AdSlotProps> = ({
   adSize = 'responsive',
   className = "",
   showPlaceholder = false,
+  framed = false,
   isClickTrackingActive = false,
   isClicked = false,
   isPendingVerification = false,
@@ -213,6 +215,49 @@ export const AdSlot: React.FC<AdSlotProps> = ({
 
   if (!hasAdCode && !showPlaceholder && !isClickTrackingActive) {
     return null;
+  }
+
+  // Unframed Clean Ad Slot (No side borders, no box frame, no card outline)
+  if (!framed) {
+    return (
+      <div 
+        ref={wrapperRef}
+        id={`ad-slot-wrapper-${slotId}`}
+        data-slot-id={slotId}
+        className={`ad-container-slot my-3 mx-auto flex flex-col items-center relative ${sizeConfig.containerClass} ${className}`}
+      >
+        {hasAdCode ? (
+          <div className="w-full flex justify-center items-center">
+            <div 
+              ref={containerRef} 
+              onMouseDown={handleContainerMouseDown}
+              className={`flex justify-center items-center w-full ${sizeConfig.minHeight} overflow-hidden cursor-pointer`} 
+            />
+          </div>
+        ) : (
+          <div 
+            onClick={isClickTrackingActive ? handleSimulatedAdClick : undefined}
+            className={`w-full ${sizeConfig.minHeight} flex flex-col items-center justify-center p-3 text-center transition-all ${
+              isClickTrackingActive ? 'cursor-pointer hover:opacity-80' : ''
+            }`}
+          >
+            {isClickTrackingActive && (
+              <div className="flex items-center gap-2 mb-1">
+                <span className={`w-1.5 h-1.5 rounded-full ${isClicked ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse'}`}></span>
+                <span className="text-xs font-mono font-semibold uppercase tracking-wider text-rose-500">
+                  {isClicked ? '✓ Ad Click Registered' : 'Click Sponsored Banner Here'}
+                </span>
+              </div>
+            )}
+            {showPlaceholder && !isClickTrackingActive && (
+              <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">
+                {displaySizeLabel}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    );
   }
 
   // Border styling depending on click status

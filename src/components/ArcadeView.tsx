@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Gamepad2, Sparkles, Flame, Grid, Search, BookOpen, Clock, Calendar, 
-  ArrowRight, Shield, Play, Star, Trophy, Zap, Compass, Lock, Sliders 
+  ArrowRight, Shield, Play, Star, Trophy, Zap, Compass 
 } from 'lucide-react';
 import { BlogConfig, CustomPost } from '../types';
 import { Game, GAME_CATEGORIES, INITIAL_GAMES } from '../data/gamesData';
@@ -35,7 +35,6 @@ export const ArcadeView: React.FC<ArcadeViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'newest' | 'popular' | 'blogs'>('all');
   const [activeGame, setActiveGame] = useState<Game | null>(null);
-  const [showAdminModal, setShowAdminModal] = useState<boolean>(false);
 
   const isDark = config.theme === 'dark';
 
@@ -165,6 +164,18 @@ export const ArcadeView: React.FC<ArcadeViewProps> = ({
           onSearchChange={setSearchQuery}
           onToggleTheme={onToggleTheme}
           onSelectGame={handleOpenGame}
+          selectedCategory={selectedCategory}
+          onSelectCategory={(cat) => {
+            setSelectedCategory(cat);
+            setSelectedFilter('all');
+            handleCloseGame();
+          }}
+          selectedFilter={selectedFilter}
+          onSelectFilter={(filt) => {
+            setSelectedFilter(filt);
+            handleCloseGame();
+          }}
+          onAutoplay={handleAutoplayRandom}
         />
         <GamePlayerModal
           game={activeGame}
@@ -184,24 +195,30 @@ export const ArcadeView: React.FC<ArcadeViewProps> = ({
       isDark ? 'bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'
     }`}>
       
-      {/* 1. Header Bar (Cleaned, no public admin buttons exposed) */}
+      {/* 1. Header Bar (With mobile nav button drawer) */}
       <ZontalHeader
         config={config}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onToggleTheme={onToggleTheme}
         onSelectGame={handleOpenGame}
+        selectedCategory={selectedCategory}
+        onSelectCategory={setSelectedCategory}
+        selectedFilter={selectedFilter}
+        onSelectFilter={setSelectedFilter}
+        onAutoplay={handleAutoplayRandom}
       />
 
-      {/* Top Banner Ad Slot */}
+      {/* Top Banner Ad Slot (Clean unframed banner) */}
       {(config.headerAdCode || config.safelinkConfig?.headerBanner) && (
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 pt-4">
           <AdSlot
             code={config.headerAdCode || config.safelinkConfig?.headerBanner}
             slotId="arcade-top-ad"
             label="Header Banner Ad"
             adSize="728x90"
             showPlaceholder={false}
+            framed={false}
           />
         </div>
       )}
@@ -523,15 +540,6 @@ export const ArcadeView: React.FC<ArcadeViewProps> = ({
             <button onClick={() => setSelectedFilter('blogs')} className="hover:text-rose-400 transition-colors cursor-pointer">
               Guides &amp; Blogs
             </button>
-            
-            {/* Discreet Admin Portal Trigger */}
-            <button 
-              onClick={() => setShowAdminModal(true)} 
-              className="text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1 cursor-pointer"
-            >
-              <Lock className="w-3 h-3" />
-              <span>Site Management</span>
-            </button>
           </div>
 
           <div className="text-[11px] text-slate-500 font-mono">
@@ -540,54 +548,6 @@ export const ArcadeView: React.FC<ArcadeViewProps> = ({
 
         </div>
       </footer>
-
-      {/* Discreet Admin Portal Access Modal */}
-      {showAdminModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <div className="flex items-center gap-2 text-white font-bold text-sm">
-                <Lock className="w-4 h-4 text-rose-500" />
-                <span>Site Management Access</span>
-              </div>
-              <button 
-                onClick={() => setShowAdminModal(false)}
-                className="text-slate-400 hover:text-white text-xs cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-400">
-              Select an administrative section to configure monetization, ads, or content.
-            </p>
-
-            <div className="space-y-2 pt-2">
-              <button
-                onClick={() => { setShowAdminModal(false); onNavigateSafelinkAdmin(); }}
-                className="w-full p-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-left text-xs font-bold text-white flex items-center justify-between cursor-pointer border border-slate-700"
-              >
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-rose-400" />
-                  <span>Safelink Admin Panel</span>
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
-              </button>
-
-              <button
-                onClick={() => { setShowAdminModal(false); onNavigateBlogAdmin(); }}
-                className="w-full p-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-left text-xs font-bold text-white flex items-center justify-between cursor-pointer border border-slate-700"
-              >
-                <div className="flex items-center gap-2">
-                  <Sliders className="w-4 h-4 text-amber-400" />
-                  <span>Portal & Ads Admin</span>
-                </div>
-                <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 4. Full Featured Game Player Modal */}
       {activeGame && (
