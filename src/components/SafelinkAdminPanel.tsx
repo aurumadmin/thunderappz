@@ -24,7 +24,7 @@ import {
   Globe,
   Ban
 } from 'lucide-react';
-import { BlogConfig, SafelinkAdminConfig } from '../types';
+import { BlogConfig, SafelinkAdminConfig, FaucetAdSlotConfig, DEFAULT_FAUCET_AD_SLOTS, AdSize } from '../types';
 import { SecurityShield } from './SecurityShield';
 
 interface SafelinkAdminPanelProps {
@@ -91,6 +91,9 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
     faucetHeadingTitle: config.safelinkConfig?.faucetHeadingTitle || 'Continue',
     faucetStepMessage: config.safelinkConfig?.faucetStepMessage || 'There is no shortlink on this step. Simply click Continue once the timer finishes to proceed.',
     faucetButtonLabel: config.safelinkConfig?.faucetButtonLabel || 'Continue',
+    faucetAdSlots: config.safelinkConfig?.faucetAdSlots && config.safelinkConfig.faucetAdSlots.length > 0
+      ? config.safelinkConfig.faucetAdSlots
+      : DEFAULT_FAUCET_AD_SLOTS,
   };
 
   const [authenticated, setAuthenticated] = useState<boolean>(false);
@@ -98,9 +101,37 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
   const [authError, setAuthError] = useState<string>('');
 
   const [formConfig, setFormConfig] = useState<SafelinkAdminConfig>(currentSafelinkConfig);
-  const [activeTab, setActiveTab] = useState<'ads' | 'adslab' | 'timers' | 'faucet' | 'security' | 'autoScript' | 'tester'>('ads');
+  const [activeTab, setActiveTab] = useState<'ads' | 'faucetAds' | 'adslab' | 'timers' | 'faucet' | 'security' | 'autoScript' | 'tester'>('faucetAds');
   const [testShieldOpen, setTestShieldOpen] = useState<boolean>(false);
   const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
+
+  // 15-20 Faucet Ad Placements State & Handlers
+  const faucetSlots = formConfig.faucetAdSlots && formConfig.faucetAdSlots.length > 0
+    ? formConfig.faucetAdSlots
+    : DEFAULT_FAUCET_AD_SLOTS;
+
+  const [selectedSlotSizeFilter, setSelectedSlotSizeFilter] = useState<string>('all');
+
+  const handleUpdateFaucetSlot = (id: string, updates: Partial<FaucetAdSlotConfig>) => {
+    const updated = faucetSlots.map((slot) =>
+      slot.id === id ? { ...slot, ...updates } : slot
+    );
+    setFormConfig({ ...formConfig, faucetAdSlots: updated });
+  };
+
+  const handleFillDemoFaucetAds = () => {
+    const filled = faucetSlots.map((slot) => ({
+      ...slot,
+      enabled: true,
+      code: `<div style="padding: 14px; background: rgba(225,29,72,0.12); border: 2px dashed rgba(225,29,72,0.6); text-align: center; color: #f43f5e; font-family: monospace; font-size: 12px; border-radius: 10px;"><strong>${slot.name} (${slot.size})</strong><br/><span style="font-size:10px; color:#cbd5e1;">Location: ${slot.location || 'Faucet Page Placement'}</span></div>`
+    }));
+    setFormConfig({ ...formConfig, faucetAdSlots: filled });
+  };
+
+  const handleClearAllFaucetAds = () => {
+    const cleared = faucetSlots.map((slot) => ({ ...slot, code: '' }));
+    setFormConfig({ ...formConfig, faucetAdSlots: cleared });
+  };
   
   // Test link generator state
   const [testTargetUrl, setTestTargetUrl] = useState<string>('https://example.com/download-file.zip');
@@ -336,6 +367,21 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
         >
           <FileText className="w-4 h-4" />
           Banner & Popunder Ads
+        </button>
+
+        <button
+          onClick={() => setActiveTab('faucetAds')}
+          className={`px-5 py-3 text-xs font-semibold uppercase tracking-wider border-b-2 whitespace-nowrap transition-all flex items-center gap-2 cursor-pointer ${
+            activeTab === 'faucetAds'
+              ? 'border-rose-500 text-rose-400 bg-rose-500/5'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Layers className="w-4 h-4 text-rose-400" />
+          <span>20 Faucet Ad Placements</span>
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+            20 Slots
+          </span>
         </button>
 
         <button
@@ -881,6 +927,152 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: 20 Faucet Ad Banner Placements */}
+      {activeTab === 'faucetAds' && (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-rose-500/30 rounded-2xl p-6 space-y-6 shadow-xl">
+            
+            {/* Header & Quick Actions */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+              <div>
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 font-extrabold text-sm">
+                    20
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                      <Layers className="w-5 h-5 text-rose-400" />
+                      15-20 Banner Ads Placements (Faucet Ad Pages)
+                    </h3>
+                    <p className="text-xs text-slate-300 mt-1">
+                      Configure 20 high-converting banner ad slots of different sizes across Faucet ad step pages. All ad slots support standard IAB sizes, scripts, images, and HTML5 banners.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleFillDemoFaucetAds}
+                  className="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl transition-all shadow-md shadow-rose-600/20 flex items-center gap-2 cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  Fill 20 Demo Ads
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearAllFaucetAds}
+                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition-all border border-slate-700 flex items-center gap-2 cursor-pointer"
+                >
+                  Clear All Codes
+                </button>
+              </div>
+            </div>
+
+            {/* Filter by Size Options */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+              <span className="text-xs font-mono font-bold text-slate-400 uppercase mr-2">Filter Size:</span>
+              {['all', '728x90', '300x250', '468x60', '300x600', '160x600', '336x280', '320x100', '320x50'].map((sz) => (
+                <button
+                  key={sz}
+                  type="button"
+                  onClick={() => setSelectedSlotSizeFilter(sz)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                    selectedSlotSizeFilter === sz
+                      ? 'bg-rose-600 text-white shadow-md'
+                      : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-slate-200'
+                  }`}
+                >
+                  {sz === 'all' ? 'All Sizes (20)' : sz}
+                </button>
+              ))}
+            </div>
+
+            {/* Grid List of 20 Ad Slots */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {faucetSlots
+                .filter((slot) => selectedSlotSizeFilter === 'all' || slot.size === selectedSlotSizeFilter)
+                .map((slot) => (
+                  <div 
+                    key={slot.id}
+                    className={`p-5 rounded-2xl border transition-all ${
+                      slot.code && slot.code.trim()
+                        ? 'bg-slate-950 border-rose-500/40 shadow-lg'
+                        : 'bg-slate-950/60 border-slate-800'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3 mb-3 pb-2 border-b border-slate-800/80">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="w-6 h-6 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 font-mono text-xs font-bold flex items-center justify-center shrink-0">
+                          {slot.id.replace('faucet_slot_', '')}
+                        </span>
+                        <div className="min-w-0">
+                          <h4 className="text-xs font-bold text-slate-100 truncate">{slot.name}</h4>
+                          <span className="text-[10px] text-slate-400 font-mono">{slot.location}</span>
+                        </div>
+                      </div>
+
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input
+                          type="checkbox"
+                          checked={slot.enabled !== false}
+                          onChange={(e) => handleUpdateFaucetSlot(slot.id, { enabled: e.target.checked })}
+                          className="sr-only peer"
+                        />
+                        <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-600"></div>
+                      </label>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-[11px] font-mono uppercase tracking-wider text-slate-400">Ad Dimension Size:</label>
+                        <select
+                          value={slot.size}
+                          onChange={(e) => handleUpdateFaucetSlot(slot.id, { size: e.target.value as AdSize })}
+                          className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs font-mono font-bold text-rose-400 focus:outline-none focus:border-rose-500"
+                        >
+                          <option value="728x90">728×90 Leaderboard</option>
+                          <option value="300x250">300×250 Medium Rectangle</option>
+                          <option value="468x60">468×60 Full Banner</option>
+                          <option value="300x600">300×600 Half Page</option>
+                          <option value="160x600">160×600 Wide Skyscraper</option>
+                          <option value="336x280">336×280 Large Rectangle</option>
+                          <option value="320x100">320×100 Large Mobile</option>
+                          <option value="320x50">320×50 Mobile Banner</option>
+                          <option value="responsive">Responsive / Fluid</option>
+                        </select>
+                      </div>
+
+                      <textarea
+                        rows={3}
+                        value={slot.code || ''}
+                        onChange={(e) => handleUpdateFaucetSlot(slot.id, { code: e.target.value })}
+                        placeholder={`Paste HTML/JS Code for ${slot.name} (${slot.size})...`}
+                        className="w-full bg-slate-900 border border-slate-800/80 rounded-xl p-3 text-[11px] font-mono text-slate-200 focus:outline-none focus:border-rose-500 leading-relaxed"
+                      />
+
+                      <div className="flex items-center justify-between text-[10px] font-mono text-slate-500">
+                        <span>Status: {slot.code ? '🟢 Code Active' : '⚪ Slot Empty'}</span>
+                        {slot.code && (
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateFaucetSlot(slot.id, { code: '' })}
+                            className="text-rose-400 hover:text-rose-300 cursor-pointer"
+                          >
+                            Clear Slot
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+
           </div>
         </div>
       )}

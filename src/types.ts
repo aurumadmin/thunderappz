@@ -35,6 +35,38 @@ export type AdSize =
   | '728x90' 
   | 'responsive';
 
+export interface FaucetAdSlotConfig {
+  id: string;
+  name: string;
+  code: string;
+  size: AdSize;
+  enabled: boolean;
+  location?: string;
+}
+
+export const DEFAULT_FAUCET_AD_SLOTS: FaucetAdSlotConfig[] = [
+  { id: 'faucet_slot_1', name: '01. Top Header Leaderboard Banner', code: '', size: '728x90', enabled: true, location: 'Header Top (Desktop)' },
+  { id: 'faucet_slot_2', name: '02. Top Mobile Large Banner', code: '', size: '320x100', enabled: true, location: 'Header Mobile' },
+  { id: 'faucet_slot_3', name: '03. Above Main Card Full Banner', code: '', size: '468x60', enabled: true, location: 'Above Main Step Card' },
+  { id: 'faucet_slot_4', name: '04. Desktop Left Sidebar Skyscraper', code: '', size: '160x600', enabled: true, location: 'Left Sidebar Upper' },
+  { id: 'faucet_slot_5', name: '05. Desktop Right Sidebar Half-Page', code: '', size: '300x600', enabled: true, location: 'Right Sidebar Upper' },
+  { id: 'faucet_slot_6', name: '06. Main Card Top Medium Rectangle', code: '', size: '300x250', enabled: true, location: 'Card Inside Header' },
+  { id: 'faucet_slot_7', name: '07. Notice Area Large Rectangle', code: '', size: '336x280', enabled: true, location: 'Card Notice Section' },
+  { id: 'faucet_slot_8', name: '08. Above Countdown Timer Banner', code: '', size: '468x60', enabled: true, location: 'Above Wait Timer' },
+  { id: 'faucet_slot_9', name: '09. Inside Timer Block Medium Rectangle', code: '', size: '300x250', enabled: true, location: 'Timer Block Section' },
+  { id: 'faucet_slot_10', name: '10. Step Progress In-Content Banner', code: '', size: '728x90', enabled: true, location: 'Card Progress Section' },
+  { id: 'faucet_slot_11', name: '11. Directly Above Continue Button', code: '', size: '320x50', enabled: true, location: 'Above Action Button' },
+  { id: 'faucet_slot_12', name: '12. Directly Below Continue Button', code: '', size: '468x60', enabled: true, location: 'Below Action Button' },
+  { id: 'faucet_slot_13', name: '13. Main Card Bottom Medium Rectangle', code: '', size: '300x250', enabled: true, location: 'Card Bottom Section' },
+  { id: 'faucet_slot_14', name: '14. Below Main Card Leaderboard', code: '', size: '728x90', enabled: true, location: 'Below Main Step Card' },
+  { id: 'faucet_slot_15', name: '15. Secondary Content Large Rectangle', code: '', size: '336x280', enabled: true, location: 'Secondary Block Area' },
+  { id: 'faucet_slot_16', name: '16. Lower Left Column Medium Rectangle', code: '', size: '300x250', enabled: true, location: 'Left Sidebar Lower' },
+  { id: 'faucet_slot_17', name: '17. Lower Right Column Wide Skyscraper', code: '', size: '160x600', enabled: true, location: 'Right Sidebar Lower' },
+  { id: 'faucet_slot_18', name: '18. Pre-Footer Wide Leaderboard', code: '', size: '728x90', enabled: true, location: 'Pre-Footer Section' },
+  { id: 'faucet_slot_19', name: '19. Footer Mobile Banner', code: '', size: '320x100', enabled: true, location: 'Footer Mobile Section' },
+  { id: 'faucet_slot_20', name: '20. Footer Bottom Wide Leaderboard', code: '', size: '728x90', enabled: true, location: 'Footer Bottom Area' }
+];
+
 export interface SafelinkAdminConfig {
   adminPassword?: string;
   headCode?: string;
@@ -98,6 +130,9 @@ export interface SafelinkAdminConfig {
   faucetHeadingTitle?: string;
   faucetStepMessage?: string;
   faucetButtonLabel?: string;
+
+  // 15-20 Faucet Ad Banner Placements
+  faucetAdSlots?: FaucetAdSlotConfig[];
 }
 
 export interface BlogConfig {

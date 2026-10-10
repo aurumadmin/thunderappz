@@ -518,12 +518,11 @@ export const ArcadeView: React.FC<ArcadeViewProps> = ({
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6 text-xs">
           
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-rose-600 text-white flex items-center justify-center font-bold">
-              <Gamepad2 className="w-5 h-5" />
+            <div className="w-8 h-8 rounded-lg bg-rose-600 text-white flex items-center justify-center font-bold font-mono">
+              ⚡
             </div>
             <div>
-              <span className="font-bold text-slate-200 uppercase tracking-wider">ZONTAL ARCADE</span>
-              <p className="text-[11px] text-slate-500">Free Online HTML5 Arcade Game Portal</p>
+              <span className="font-bold text-slate-200 uppercase tracking-wider">THUNDER APPZ</span>
             </div>
           </div>
 
@@ -537,13 +536,10 @@ export const ArcadeView: React.FC<ArcadeViewProps> = ({
             <button onClick={() => setSelectedFilter('popular')} className="hover:text-rose-400 transition-colors cursor-pointer">
               Popular Games
             </button>
-            <button onClick={() => setSelectedFilter('blogs')} className="hover:text-rose-400 transition-colors cursor-pointer">
-              Guides &amp; Blogs
-            </button>
           </div>
 
           <div className="text-[11px] text-slate-500 font-mono">
-            © {new Date().getFullYear()} Zontal Arcade. All rights reserved.
+            © {new Date().getFullYear()} Thunder Appz. All rights reserved.
           </div>
 
         </div>

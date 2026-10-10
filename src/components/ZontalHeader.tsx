@@ -104,15 +104,9 @@ export const ZontalHeader: React.FC<ZontalHeaderProps> = ({
           <div>
             <div className="flex items-center gap-1">
               <span className="text-lg sm:text-xl font-black tracking-tight font-serif text-rose-500 uppercase">
-                ZONTAL
-              </span>
-              <span className="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-widest px-1.5 sm:px-2 py-0.5 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 font-mono">
-                ARCADE
+                Thunder Appz
               </span>
             </div>
-            <p className="text-[10px] text-slate-400 -mt-1 hidden md:block font-medium">
-              Free HTML5 Games Portal
-            </p>
           </div>
         </a>
 
