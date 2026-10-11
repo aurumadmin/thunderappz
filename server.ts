@@ -712,6 +712,27 @@ async function startServer() {
   });
 
   // Serve Kadam verification file (kadamd5f4c7b55fcd2f291a466ca65bce8c0a)
+  // Domain Ownership Verification for FaucetAd (https://thunder-appz.eu.org/.well-known/faucetad-verification.txt)
+  app.get(["/.well-known/faucetad-verification.txt", "/faucetad-verification.txt"], (req, res) => {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.status(200).send("faucetad-verify=2ee69d74c07699a444eb5d02833b4b15bdc731f330770b980467c2bb2b0073c1");
+  });
+
+  // Dynamic route handler for any file under /.well-known/
+  app.get("/.well-known/:filename", (req, res, next) => {
+    const filename = req.params.filename;
+    if (!filename) return next();
+    const safeFilename = path.basename(filename.trim());
+    const filePath = path.join(process.cwd(), "public", ".well-known", safeFilename);
+    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      return res.status(200).sendFile(filePath);
+    }
+    next();
+  });
+
   app.get(["/kadamd5f4c7b55fcd2f291a466ca65bce8c0a", "/kadamd5f4c7b55fcd2f291a466ca65bce8c0a.html", "/kadamd5f4c7b55fcd2f291a466ca65bce8c0a.txt"], (req, res) => {
     const filePath = path.join(process.cwd(), "public", "kadamd5f4c7b55fcd2f291a466ca65bce8c0a");
     if (fs.existsSync(filePath)) {
