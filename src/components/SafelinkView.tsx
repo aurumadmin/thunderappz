@@ -202,8 +202,6 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
       !rawUrlParam.includes('/faucet?') &&
       !rawUrlParam.endsWith('/faucet') &&
       !rawUrlParam.endsWith('/faucet/') &&
-      rawUrlParam !== 'https://tglinks.eu.cc' &&
-      rawUrlParam !== 'https://tglinks.eu.cc/' &&
       (rawUrlParam.startsWith('http://') || rawUrlParam.startsWith('https://') || rawUrlParam.startsWith('/'))
     ) {
       if (rawUrlParam.startsWith('/')) {
@@ -229,12 +227,24 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
     if (
       safelinkCfg.faucetDestinationUrl && 
       safelinkCfg.faucetDestinationUrl.trim() !== '' &&
-      !safelinkCfg.faucetDestinationUrl.includes('tglinks.eu.cc') &&
       !safelinkCfg.faucetDestinationUrl.includes('faucet-final') &&
       !safelinkCfg.faucetDestinationUrl.includes('/faucet') &&
       safelinkCfg.faucetDestinationUrl.startsWith('http')
     ) {
-      return safelinkCfg.faucetDestinationUrl;
+      let dest = safelinkCfg.faucetDestinationUrl.trim();
+      const realCode = (code && code.trim() && code !== 'demo') 
+        ? code.trim() 
+        : (fullParams.get('code') || fullParams.get('c') || fullParams.get('go') || fullParams.get('alias') || 'phWVry');
+      const realToken = (token && token.trim() && token !== 'tg_token_demo') 
+        ? token.trim() 
+        : (fullParams.get('token') || fullParams.get('t') || '');
+      const realSubId = subId || fullParams.get('sub_id') || fullParams.get('subid') || '';
+
+      if (dest.includes('{code}')) dest = dest.replace('{code}', encodeURIComponent(realCode));
+      if (dest.includes('{token}')) dest = dest.replace('{token}', encodeURIComponent(realToken));
+      if (dest.includes('{sub_id}')) dest = dest.replace('{sub_id}', encodeURIComponent(realSubId));
+
+      return dest;
     }
 
     // 4. Extract real params
@@ -248,8 +258,9 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
 
     const realSubId = subId || fullParams.get('sub_id') || fullParams.get('subid') || '';
 
-    // 5. Direct to the shortened URL page (/go/:code) on this site to get the final link
-    const targetUrl = new URL(`${window.location.origin}/go/${encodeURIComponent(realCode)}`);
+    // 5. Direct to the TG Links steps completion page (https://tglinks.eu.cc/go/:code)
+    const tglinksBase = 'https://tglinks.eu.cc';
+    const targetUrl = new URL(`${tglinksBase}/go/${encodeURIComponent(realCode)}`);
     if (realToken) {
       targetUrl.searchParams.set('token', realToken);
     }
