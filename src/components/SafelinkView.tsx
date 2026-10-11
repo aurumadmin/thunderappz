@@ -193,15 +193,20 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
   const getFaucetDestinationUrl = (): string => {
     const rawUrlParam = fullParams.get('url') || fullParams.get('link') || fullParams.get('dest') || fullParams.get('target');
     
-    // 1. Check if an explicit external destination URL was provided that is NOT the blog domain itself and NOT faucet-final
+    // 1. Check if an explicit destination URL was provided that is NOT a faucet loop route
     if (
       rawUrlParam && 
       typeof rawUrlParam === 'string' &&
       !rawUrlParam.includes('faucet-final') &&
-      !rawUrlParam.includes('thunder-appz.eu.org') &&
-      !rawUrlParam.includes(window.location.host) &&
-      (rawUrlParam.startsWith('http://') || rawUrlParam.startsWith('https://'))
+      !rawUrlParam.includes('/faucet/final') &&
+      !rawUrlParam.includes('/faucet?') &&
+      !rawUrlParam.endsWith('/faucet') &&
+      !rawUrlParam.endsWith('/faucet/') &&
+      (rawUrlParam.startsWith('http://') || rawUrlParam.startsWith('https://') || rawUrlParam.startsWith('/'))
     ) {
+      if (rawUrlParam.startsWith('/')) {
+        return `${window.location.origin}${rawUrlParam}`;
+      }
       return rawUrlParam;
     }
 
@@ -218,11 +223,11 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
       }
     }
 
-    // 3. Check if safelinkCfg.faucetDestinationUrl is configured to a custom external target (and not faucet-final or blog domain)
+    // 3. Check if safelinkCfg.faucetDestinationUrl is configured
     if (
       safelinkCfg.faucetDestinationUrl && 
       !safelinkCfg.faucetDestinationUrl.includes('faucet-final') &&
-      !safelinkCfg.faucetDestinationUrl.includes('thunder-appz.eu.org') &&
+      !safelinkCfg.faucetDestinationUrl.includes('/faucet') &&
       safelinkCfg.faucetDestinationUrl.startsWith('http')
     ) {
       return safelinkCfg.faucetDestinationUrl;
@@ -235,19 +240,20 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
     
     const realToken = (token && token.trim() && token !== 'tg_token_demo') 
       ? token.trim() 
-      : (fullParams.get('token') || fullParams.get('t') || 'tg_token_demo');
+      : (fullParams.get('token') || fullParams.get('t') || '');
 
-    const realSubId = subId || fullParams.get('sub_id') || fullParams.get('subid') || realCode;
+    const realSubId = subId || fullParams.get('sub_id') || fullParams.get('subid') || '';
 
-    // Return TG Links completion handoff URL directly (No redirect to /faucet-final/)
-    const targetUrl = new URL(`https://tglinks.eu.cc/p/${encodeURIComponent(realCode)}`);
-    targetUrl.searchParams.set('token', realToken);
-    targetUrl.searchParams.set('status', 'completed');
-    if (realSubId) {
+    // 5. Direct to the shortened URL page (/go/:code) on this site to get the final link
+    const targetUrl = new URL(`${window.location.origin}/go/${encodeURIComponent(realCode)}`);
+    if (realToken) {
+      targetUrl.searchParams.set('token', realToken);
+    }
+    if (realSubId && realSubId !== realCode) {
       targetUrl.searchParams.set('sub_id', realSubId);
     }
 
-    // Preserve any extra original search params except internal routing keys
+    // Preserve any extra original search params except internal faucet routing keys
     fullParams.forEach((val, key) => {
       if (!['code', 'c', 'token', 't', 'status', 'step', 'page', 'faucet', 'total_steps', 'pages_per_step', 'url', 'dest', 'link', 'target', 'alias', 'alias_code', 'id', 'go', 'faucet_final', 'final'].includes(key)) {
         targetUrl.searchParams.set(key, val);
