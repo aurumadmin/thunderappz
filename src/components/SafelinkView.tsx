@@ -94,7 +94,17 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
   const isClickAdsRequirementMet = totalClickedCount >= requiredClickAdsCount;
 
   // 5. Faucet Traffic Mode State & Handlers
+  const isFaucetFinal = 
+    window.location.pathname === '/faucet-final' ||
+    window.location.pathname === '/faucet-final/' ||
+    window.location.pathname.startsWith('/faucet-final') ||
+    window.location.pathname.startsWith('/faucet/final') ||
+    fullParams.get('faucet_final') !== null ||
+    fullParams.get('final') === 'true' ||
+    fullParams.get('final') === '1';
+
   const isFaucetTraffic = 
+    isFaucetFinal ||
     window.location.pathname.startsWith('/faucet') ||
     fullParams.get('faucet') !== null ||
     fullParams.get('type') === 'faucet' ||
@@ -141,7 +151,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
   const [faucetTimerDone, setFaucetTimerDone] = useState<boolean>(faucetStepTimerSeconds <= 0);
 
   useEffect(() => {
-    if (!isFaucetTraffic) return;
+    if (!isFaucetTraffic || isFaucetFinal) return;
 
     setFaucetTimer(faucetStepTimerSeconds);
     setFaucetTimerDone(faucetStepTimerSeconds <= 0);
@@ -160,16 +170,17 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isFaucetTraffic, currentFaucetStep, currentFaucetPage, faucetStepTimerSeconds]);
+  }, [isFaucetTraffic, isFaucetFinal, currentFaucetStep, currentFaucetPage, faucetStepTimerSeconds]);
 
   // Destination URL resolution for Faucet Mode
   const getFaucetDestinationUrl = (): string => {
     const rawUrlParam = fullParams.get('url') || fullParams.get('link') || fullParams.get('dest') || fullParams.get('target');
     
-    // 1. Check if an explicit external destination URL was provided that is NOT the blog domain itself and NOT a tglinks callback URL
+    // 1. Check if an explicit external destination URL was provided that is NOT the blog domain itself, NOT faucet-final, and NOT a tglinks callback URL
     if (
       rawUrlParam && 
       typeof rawUrlParam === 'string' &&
+      !rawUrlParam.includes('faucet-final') &&
       !rawUrlParam.includes('thunder-appz.eu.org') &&
       !rawUrlParam.includes(window.location.host) &&
       (rawUrlParam.startsWith('http://') || rawUrlParam.startsWith('https://')) &&
@@ -191,9 +202,10 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
       }
     }
 
-    // 3. Check if safelinkCfg.faucetDestinationUrl is configured to a custom external target (and not the blog domain)
+    // 3. Check if safelinkCfg.faucetDestinationUrl is configured to a custom external target (and not faucet-final or blog domain)
     if (
       safelinkCfg.faucetDestinationUrl && 
+      !safelinkCfg.faucetDestinationUrl.includes('faucet-final') &&
       !safelinkCfg.faucetDestinationUrl.includes('thunder-appz.eu.org') &&
       safelinkCfg.faucetDestinationUrl.startsWith('http') &&
       !safelinkCfg.faucetDestinationUrl.includes('tglinks.eu.cc')
@@ -201,8 +213,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
       return safelinkCfg.faucetDestinationUrl;
     }
 
-    // 4. Default: Redirect back to TG Links URL Shortener website handoff URL
-    // Format: https://tglinks.eu.cc/p/:code?token={token}&status=completed&sub_id={sub_id}
+    // 4. Extract real params
     const realCode = (code && code.trim() && code !== 'demo') 
       ? code.trim() 
       : (fullParams.get('code') || fullParams.get('c') || fullParams.get('go') || fullParams.get('alias') || 'phWVry');
@@ -213,6 +224,17 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
 
     const realSubId = subId || fullParams.get('sub_id') || fullParams.get('subid') || realCode;
 
+    // If NOT on /faucet-final/ yet, transition to /faucet-final/
+    if (!isFaucetFinal) {
+      const finalUrl = new URL(`${window.location.origin}/faucet-final/`);
+      finalUrl.searchParams.set('code', realCode);
+      finalUrl.searchParams.set('token', realToken);
+      if (realSubId) finalUrl.searchParams.set('sub_id', realSubId);
+      if (rawUrlParam) finalUrl.searchParams.set('url', rawUrlParam);
+      return finalUrl.toString();
+    }
+
+    // On /faucet-final/ page: Return TG Links completion handoff URL
     const targetUrl = new URL(`https://tglinks.eu.cc/p/${encodeURIComponent(realCode)}`);
     targetUrl.searchParams.set('token', realToken);
     targetUrl.searchParams.set('status', 'completed');
@@ -222,12 +244,33 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
 
     // Preserve any extra original search params except internal routing keys
     fullParams.forEach((val, key) => {
-      if (!['code', 'c', 'token', 't', 'status', 'step', 'page', 'faucet', 'total_steps', 'pages_per_step', 'url', 'dest', 'link', 'target', 'alias', 'alias_code', 'id', 'go'].includes(key)) {
+      if (!['code', 'c', 'token', 't', 'status', 'step', 'page', 'faucet', 'total_steps', 'pages_per_step', 'url', 'dest', 'link', 'target', 'alias', 'alias_code', 'id', 'go', 'faucet_final', 'final'].includes(key)) {
         targetUrl.searchParams.set(key, val);
       }
     });
 
     return targetUrl.toString();
+  };
+
+  // Handler for Final Handoff / Claim on /faucet-final/
+  const handleFaucetFinalClaim = async () => {
+    if (isRedirecting) return;
+    setIsRedirecting(true);
+
+    const targetDest = getFaucetDestinationUrl();
+
+    // Trigger AdsLab Interstitial before redirect
+    try {
+      if (typeof window.showint_adslab === 'function') {
+        await window.showint_adslab();
+      } else if (typeof window.adslabShowInterstitial === 'function') {
+        window.adslabShowInterstitial();
+      }
+    } catch (e) {}
+
+    setTimeout(() => {
+      window.location.href = targetDest;
+    }, 400);
   };
 
   const faucetRequiredClicks = safelinkCfg.faucetClicksRequiredPerStep !== undefined 
@@ -999,10 +1042,88 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
                 {renderFaucetAd('faucet_slot_3', '', '468x60', '03. Above Main Step Card')}
 
                 {/* Centered Step Card Container */}
-                <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-8 shadow-2xl backdrop-blur-md text-center space-y-5 relative overflow-hidden">
-                  
-                  {/* Slot 6: Main Card Top */}
-                  {renderFaucetAd('faucet_slot_6', '', '300x250', '06. Main Card Top')}
+                {isFaucetFinal ? (
+                  <div className="bg-slate-900/90 border border-emerald-500/40 rounded-3xl p-6 sm:p-10 shadow-2xl shadow-emerald-500/10 backdrop-blur-md text-center space-y-6 relative overflow-hidden">
+                    
+                    {/* Slot 6: Main Card Top */}
+                    {renderFaucetAd('faucet_slot_6', '', '300x250', '06. Main Card Top')}
+
+                    {/* Big Success Icon */}
+                    <div className="w-20 h-20 mx-auto rounded-full bg-emerald-500/20 border-2 border-emerald-500/50 flex items-center justify-center text-emerald-400 shadow-xl shadow-emerald-500/20 animate-bounce">
+                      <CheckCircle2 className="w-12 h-12 stroke-[2.5]" />
+                    </div>
+
+                    {/* Header Subtitle & Title */}
+                    <div className="space-y-2">
+                      <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs font-bold font-mono">
+                        <Sparkles className="w-4 h-4 text-emerald-400" /> Faucet Verification 100% Completed
+                      </div>
+                      <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
+                        🎉 Destination Link Unlocked!
+                      </h2>
+                      <p className="text-sm text-slate-300 max-w-md mx-auto leading-relaxed">
+                        All required faucet pages have been verified successfully. Click the button below to claim your reward or proceed to your shortlink destination.
+                      </p>
+                    </div>
+
+                    {/* Status Summary Pill Badges */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 py-3 px-4 bg-slate-950/80 rounded-2xl border border-slate-800 text-xs font-semibold">
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-emerald-400 flex flex-col items-center gap-1.5">
+                        <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                        <span>All Steps Verified ✓</span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-blue-400 flex flex-col items-center gap-1.5">
+                        <Zap className="w-5 h-5 text-blue-400" />
+                        <span>Token Verified ✓</span>
+                      </div>
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-rose-400 flex flex-col items-center gap-1.5">
+                        <Award className="w-5 h-5 text-rose-400" />
+                        <span>Reward Active ✓</span>
+                      </div>
+                    </div>
+
+                    {/* Slot 7: Notice Area */}
+                    {renderFaucetAd('faucet_slot_7', '', '336x280', '07. Notice Area Banner')}
+
+                    {/* Slot 8: Above Timer Banner */}
+                    {renderFaucetAd('faucet_slot_8', safelinkCfg.aboveTimerBanner, '468x60', '08. Above Timer Banner')}
+
+                    {/* Slot 11: Above Action Button */}
+                    {renderFaucetAd('faucet_slot_11', '', '320x50', '11. Above Action Button')}
+
+                    {/* FINAL CLAIM / HANDOFF BUTTON */}
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        disabled={isRedirecting}
+                        onClick={handleFaucetFinalClaim}
+                        className={`w-full py-5 px-8 text-center text-xl font-extrabold rounded-2xl transition-all shadow-2xl flex items-center justify-center gap-3 cursor-pointer ring-4 ${
+                          isRedirecting
+                            ? 'bg-slate-800 text-slate-400 border border-slate-700/50 ring-slate-700'
+                            : 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-emerald-500/40 hover:shadow-emerald-500/60 hover:scale-[1.02] active:scale-[0.98] ring-emerald-500/30'
+                        }`}
+                      >
+                        <Sparkles className="w-6 h-6 fill-slate-950 shrink-0" />
+                        <span>{isRedirecting ? 'Redirecting to Destination...' : '🎁 Claim Reward / Get Destination Link ➔'}</span>
+                      </button>
+
+                      <span className="text-slate-400 text-xs mt-3 block font-mono">
+                        Click above to complete your link verification with TG Links securely.
+                      </span>
+                    </div>
+
+                    {/* Slot 12: Below Action Button */}
+                    {renderFaucetAd('faucet_slot_12', safelinkCfg.belowTimerBanner, '468x60', '12. Below Continue Button')}
+
+                    {/* Slot 13: Card Bottom */}
+                    {renderFaucetAd('faucet_slot_13', '', '300x250', '13. Card Bottom Rectangle')}
+
+                  </div>
+                ) : (
+                  <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-8 shadow-2xl backdrop-blur-md text-center space-y-5 relative overflow-hidden">
+                    
+                    {/* Slot 6: Main Card Top */}
+                    {renderFaucetAd('faucet_slot_6', '', '300x250', '06. Main Card Top')}
 
                   {/* Header Subtitle & Title */}
                   <div className="space-y-2">
@@ -1196,6 +1317,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
                   {renderFaucetAd('faucet_slot_13', '', '300x250', '13. Card Bottom Rectangle')}
 
                 </div>
+                )}
 
                 {/* Slot 14: Below Main Card */}
                 {renderFaucetAd('faucet_slot_14', '', '728x90', '14. Below Main Card Leaderboard')}
