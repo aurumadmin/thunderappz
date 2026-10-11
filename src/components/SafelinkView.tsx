@@ -247,35 +247,8 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
       return dest;
     }
 
-    // 4. Extract real params
-    const realCode = (code && code.trim() && code !== 'demo') 
-      ? code.trim() 
-      : (fullParams.get('code') || fullParams.get('c') || fullParams.get('go') || fullParams.get('alias') || 'phWVry');
-    
-    const realToken = (token && token.trim() && token !== 'tg_token_demo') 
-      ? token.trim() 
-      : (fullParams.get('token') || fullParams.get('t') || '');
-
-    const realSubId = subId || fullParams.get('sub_id') || fullParams.get('subid') || '';
-
-    // 5. Direct to the TG Links steps completion page (https://tglinks.eu.cc/go/:code)
-    const tglinksBase = 'https://tglinks.eu.cc';
-    const targetUrl = new URL(`${tglinksBase}/go/${encodeURIComponent(realCode)}`);
-    if (realToken) {
-      targetUrl.searchParams.set('token', realToken);
-    }
-    if (realSubId && realSubId !== realCode) {
-      targetUrl.searchParams.set('sub_id', realSubId);
-    }
-
-    // Preserve any extra original search params except internal faucet routing keys
-    fullParams.forEach((val, key) => {
-      if (!['code', 'c', 'token', 't', 'status', 'step', 'page', 'faucet', 'total_steps', 'pages_per_step', 'url', 'dest', 'link', 'target', 'alias', 'alias_code', 'id', 'go', 'faucet_final', 'final'].includes(key)) {
-        targetUrl.searchParams.set(key, val);
-      }
-    });
-
-    return targetUrl.toString();
+    // 4. Default fallback target
+    return fullParams.get('originalUrl') || fullParams.get('url') || 'https://google.com';
   };
 
   // Handler for Final Handoff / Claim on /faucet-final/
@@ -375,12 +348,25 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
       }
 
       const shortenersCount = safelinkCfg.enableFaucetExternalShorteners ? (safelinkCfg.faucetExternalShortenersCount ?? 0) : 0;
+      const vtok = 'vtok_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+      const realCode = (code && code.trim() && code !== 'demo') ? code.trim() : (fullParams.get('code') || fullParams.get('c') || 'phWVry');
+
+      // Construct return/final URL pointing to https://thunder-appz.eu.org/faucet-final/:code?vtok=...
+      const finalUrlObj = new URL(`${window.location.origin}/faucet-final/${encodeURIComponent(realCode)}`);
+      finalUrlObj.searchParams.set('vtok', vtok);
+      if (targetDest && targetDest !== 'https://google.com') {
+        finalUrlObj.searchParams.set('url', targetDest);
+      }
+      if (token && token !== 'tg_token_demo') {
+        finalUrlObj.searchParams.set('token', token);
+      }
+      if (subId && subId !== realCode) {
+        finalUrlObj.searchParams.set('sub_id', subId);
+      }
+
+      const returnFinalUrl = finalUrlObj.toString();
 
       if (shortenersCount > 0 && safelinkCfg.faucetExternalShortenerUrl) {
-        const vtok = 'vtok_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
-        const realCode = (code && code.trim() && code !== 'demo') ? code.trim() : (fullParams.get('code') || fullParams.get('c') || 'phWVry');
-        const returnFinalUrl = `${window.location.origin}/faucet-final/${encodeURIComponent(realCode)}?vtok=${vtok}&url=${encodeURIComponent(targetDest)}`;
-
         let externalUrl = safelinkCfg.faucetExternalShortenerUrl;
         if (externalUrl.includes('{url}')) {
           externalUrl = externalUrl.replace('{url}', encodeURIComponent(returnFinalUrl));
@@ -400,9 +386,9 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
           window.location.href = externalUrl;
         }, 400);
       } else {
-        // NO external shorteners in Faucet Plan (0 shorteners): Return directly to original destination URL (originalUrl)
+        // NO external shorteners in Faucet Plan (0 shorteners): redirect directly to https://thunder-appz.eu.org/faucet-final/:code?vtok=...
         setTimeout(() => {
-          window.location.href = targetDest;
+          window.location.href = returnFinalUrl;
         }, 400);
       }
     }
