@@ -1537,7 +1537,7 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
                   type="url"
                   value={formConfig.faucetDestinationUrl || ''}
                   onChange={(e) => setFormConfig({ ...formConfig, faucetDestinationUrl: e.target.value })}
-                  placeholder="https://thunder-appz.eu.org/ or https://faucetpay.io/claim"
+                  placeholder="https://tglinks.eu.cc/go/{code} or https://tglinks.eu.cc/"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-xs focus:outline-none focus:border-amber-500 font-mono"
                 />
                 <p className="text-[11px] text-slate-400 mt-1.5">

@@ -245,7 +245,12 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
       safelinkCfg.faucetDestinationUrl.startsWith('http')
     ) {
       let dest = safelinkCfg.faucetDestinationUrl.trim();
-      if (dest.includes('{code}')) dest = dest.replace('{code}', encodeURIComponent(realCode));
+      if (dest.includes('{code}')) {
+        dest = dest.replace('{code}', encodeURIComponent(realCode));
+      } else if (!dest.includes('/go/') && !dest.includes(realCode)) {
+        dest = dest.replace(/\/$/, '') + '/go/' + encodeURIComponent(realCode);
+      }
+
       if (dest.includes('{token}')) dest = dest.replace('{token}', encodeURIComponent(realToken));
       if (dest.includes('{sub_id}')) dest = dest.replace('{sub_id}', encodeURIComponent(realSubId));
 
@@ -254,6 +259,13 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
       } else if (!dest.includes('vtok=')) {
         dest = dest + (dest.includes('?') ? '&' : '?') + 'vtok=' + vtok;
       }
+      if (realToken && !dest.includes('token=')) {
+        dest = dest + '&token=' + encodeURIComponent(realToken);
+      }
+      if (realSubId && realSubId !== realCode && !dest.includes('sub_id=')) {
+        dest = dest + '&sub_id=' + encodeURIComponent(realSubId);
+      }
+
       return dest;
     }
 
