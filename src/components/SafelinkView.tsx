@@ -241,7 +241,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
       safelinkCfg.faucetDestinationUrl && 
       safelinkCfg.faucetDestinationUrl.trim() !== '' &&
       !safelinkCfg.faucetDestinationUrl.includes('faucet-final') &&
-      !safelinkCfg.faucetDestinationUrl.includes('/faucet') &&
+      !safelinkCfg.faucetDestinationUrl.includes(`${window.location.host}/faucet`) &&
       safelinkCfg.faucetDestinationUrl.startsWith('http')
     ) {
       let dest = safelinkCfg.faucetDestinationUrl.trim();
