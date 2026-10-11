@@ -224,17 +224,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
 
     const realSubId = subId || fullParams.get('sub_id') || fullParams.get('subid') || realCode;
 
-    // If NOT on /faucet-final/ yet, transition to /faucet-final/
-    if (!isFaucetFinal) {
-      const finalUrl = new URL(`${window.location.origin}/faucet-final/`);
-      finalUrl.searchParams.set('code', realCode);
-      finalUrl.searchParams.set('token', realToken);
-      if (realSubId) finalUrl.searchParams.set('sub_id', realSubId);
-      if (rawUrlParam) finalUrl.searchParams.set('url', rawUrlParam);
-      return finalUrl.toString();
-    }
-
-    // On /faucet-final/ page: Return TG Links completion handoff URL
+    // Return TG Links completion handoff URL directly (No redirect to /faucet-final/)
     const targetUrl = new URL(`https://tglinks.eu.cc/p/${encodeURIComponent(realCode)}`);
     targetUrl.searchParams.set('token', realToken);
     targetUrl.searchParams.set('status', 'completed');
