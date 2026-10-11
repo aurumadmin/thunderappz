@@ -223,7 +223,20 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
       }
     }
 
-    // 3. Check if safelinkCfg.faucetDestinationUrl is configured and valid
+    // 3. Extract real params
+    const realCode = (code && code.trim() && code !== 'demo') 
+      ? code.trim() 
+      : (fullParams.get('code') || fullParams.get('c') || fullParams.get('go') || fullParams.get('alias') || 'phWVry');
+    
+    const realToken = (token && token.trim() && token !== 'tg_token_demo') 
+      ? token.trim() 
+      : (fullParams.get('token') || fullParams.get('t') || '');
+
+    const realSubId = subId || fullParams.get('sub_id') || fullParams.get('subid') || '';
+
+    const vtok = 'vtok_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+
+    // 4. Check if safelinkCfg.faucetDestinationUrl is configured and valid
     if (
       safelinkCfg.faucetDestinationUrl && 
       safelinkCfg.faucetDestinationUrl.trim() !== '' &&
@@ -232,23 +245,37 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
       safelinkCfg.faucetDestinationUrl.startsWith('http')
     ) {
       let dest = safelinkCfg.faucetDestinationUrl.trim();
-      const realCode = (code && code.trim() && code !== 'demo') 
-        ? code.trim() 
-        : (fullParams.get('code') || fullParams.get('c') || fullParams.get('go') || fullParams.get('alias') || 'phWVry');
-      const realToken = (token && token.trim() && token !== 'tg_token_demo') 
-        ? token.trim() 
-        : (fullParams.get('token') || fullParams.get('t') || '');
-      const realSubId = subId || fullParams.get('sub_id') || fullParams.get('subid') || '';
-
       if (dest.includes('{code}')) dest = dest.replace('{code}', encodeURIComponent(realCode));
       if (dest.includes('{token}')) dest = dest.replace('{token}', encodeURIComponent(realToken));
       if (dest.includes('{sub_id}')) dest = dest.replace('{sub_id}', encodeURIComponent(realSubId));
 
+      if (dest.includes('{vtok}')) {
+        dest = dest.replace('{vtok}', vtok);
+      } else if (!dest.includes('vtok=')) {
+        dest = dest + (dest.includes('?') ? '&' : '?') + 'vtok=' + vtok;
+      }
       return dest;
     }
 
-    // 4. Default fallback target
-    return fullParams.get('originalUrl') || fullParams.get('url') || 'https://google.com';
+    // 5. Direct to the TG Links steps completion page: https://tglinks.eu.cc/go/:code?vtok=...
+    const tglinksBase = 'https://tglinks.eu.cc';
+    const targetUrl = new URL(`${tglinksBase}/go/${encodeURIComponent(realCode)}`);
+    targetUrl.searchParams.set('vtok', vtok);
+    if (realToken) {
+      targetUrl.searchParams.set('token', realToken);
+    }
+    if (realSubId && realSubId !== realCode) {
+      targetUrl.searchParams.set('sub_id', realSubId);
+    }
+
+    // Preserve any extra original search params except internal faucet routing keys
+    fullParams.forEach((val, key) => {
+      if (!['code', 'c', 'token', 't', 'status', 'step', 'page', 'faucet', 'total_steps', 'pages_per_step', 'url', 'dest', 'link', 'target', 'alias', 'alias_code', 'id', 'go', 'faucet_final', 'final', 'vtok'].includes(key)) {
+        targetUrl.searchParams.set(key, val);
+      }
+    });
+
+    return targetUrl.toString();
   };
 
   // Handler for Final Handoff / Claim on /faucet-final/
@@ -337,7 +364,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
 
       window.location.href = nextUrl.toString();
     } 
-    // Case 3: Final page of final step -> Check External Shorteners in Faucet Plan
+    // Case 3: Final page of final step -> Redirect directly to tglinks completion URL with vtok
     else {
       setIsRedirecting(true);
 
@@ -347,50 +374,11 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
         try { window.adslabShowInterstitial(); } catch (e) {}
       }
 
-      const shortenersCount = safelinkCfg.enableFaucetExternalShorteners ? (safelinkCfg.faucetExternalShortenersCount ?? 0) : 0;
-      const vtok = 'vtok_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
-      const realCode = (code && code.trim() && code !== 'demo') ? code.trim() : (fullParams.get('code') || fullParams.get('c') || 'phWVry');
+      const completionUrl = getFaucetDestinationUrl();
 
-      // Construct return/final URL pointing to https://thunder-appz.eu.org/faucet-final/:code?vtok=...
-      const finalUrlObj = new URL(`${window.location.origin}/faucet-final/${encodeURIComponent(realCode)}`);
-      finalUrlObj.searchParams.set('vtok', vtok);
-      if (targetDest && targetDest !== 'https://google.com') {
-        finalUrlObj.searchParams.set('url', targetDest);
-      }
-      if (token && token !== 'tg_token_demo') {
-        finalUrlObj.searchParams.set('token', token);
-      }
-      if (subId && subId !== realCode) {
-        finalUrlObj.searchParams.set('sub_id', subId);
-      }
-
-      const returnFinalUrl = finalUrlObj.toString();
-
-      if (shortenersCount > 0 && safelinkCfg.faucetExternalShortenerUrl) {
-        let externalUrl = safelinkCfg.faucetExternalShortenerUrl;
-        if (externalUrl.includes('{url}')) {
-          externalUrl = externalUrl.replace('{url}', encodeURIComponent(returnFinalUrl));
-        } else if (externalUrl.includes('{dest}')) {
-          externalUrl = externalUrl.replace('{dest}', encodeURIComponent(returnFinalUrl));
-        } else {
-          try {
-            const u = new URL(externalUrl);
-            u.searchParams.set('url', returnFinalUrl);
-            externalUrl = u.toString();
-          } catch (e) {
-            externalUrl = `${externalUrl}${externalUrl.includes('?') ? '&' : '?'}url=${encodeURIComponent(returnFinalUrl)}`;
-          }
-        }
-
-        setTimeout(() => {
-          window.location.href = externalUrl;
-        }, 400);
-      } else {
-        // NO external shorteners in Faucet Plan (0 shorteners): redirect directly to https://thunder-appz.eu.org/faucet-final/:code?vtok=...
-        setTimeout(() => {
-          window.location.href = returnFinalUrl;
-        }, 400);
-      }
+      setTimeout(() => {
+        window.location.href = completionUrl;
+      }, 400);
     }
   };
 
