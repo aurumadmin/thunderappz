@@ -131,6 +131,11 @@ export interface SafelinkAdminConfig {
   faucetStepMessage?: string;
   faucetButtonLabel?: string;
 
+  // Faucet Plan & External Shortener Configuration
+  enableFaucetExternalShorteners?: boolean;
+  faucetExternalShortenersCount?: number;
+  faucetExternalShortenerUrl?: string;
+
   // 15-20 Faucet Ad Banner Placements
   faucetAdSlots?: FaucetAdSlotConfig[];
 }

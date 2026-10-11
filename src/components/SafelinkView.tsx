@@ -191,7 +191,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
 
   // Destination URL resolution for Faucet Mode
   const getFaucetDestinationUrl = (): string => {
-    const rawUrlParam = fullParams.get('url') || fullParams.get('link') || fullParams.get('dest') || fullParams.get('target');
+    const rawUrlParam = fullParams.get('url') || fullParams.get('link') || fullParams.get('dest') || fullParams.get('target') || fullParams.get('originalUrl') || fullParams.get('return_url');
     
     // 1. Check if an explicit destination URL was provided that is NOT a faucet loop route
     if (
@@ -202,6 +202,8 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
       !rawUrlParam.includes('/faucet?') &&
       !rawUrlParam.endsWith('/faucet') &&
       !rawUrlParam.endsWith('/faucet/') &&
+      rawUrlParam !== 'https://tglinks.eu.cc' &&
+      rawUrlParam !== 'https://tglinks.eu.cc/' &&
       (rawUrlParam.startsWith('http://') || rawUrlParam.startsWith('https://') || rawUrlParam.startsWith('/'))
     ) {
       if (rawUrlParam.startsWith('/')) {
@@ -223,9 +225,11 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
       }
     }
 
-    // 3. Check if safelinkCfg.faucetDestinationUrl is configured
+    // 3. Check if safelinkCfg.faucetDestinationUrl is configured and valid
     if (
       safelinkCfg.faucetDestinationUrl && 
+      safelinkCfg.faucetDestinationUrl.trim() !== '' &&
+      !safelinkCfg.faucetDestinationUrl.includes('tglinks.eu.cc') &&
       !safelinkCfg.faucetDestinationUrl.includes('faucet-final') &&
       !safelinkCfg.faucetDestinationUrl.includes('/faucet') &&
       safelinkCfg.faucetDestinationUrl.startsWith('http')
@@ -349,7 +353,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
 
       window.location.href = nextUrl.toString();
     } 
-    // Case 3: Final page of final step -> Open destination URL
+    // Case 3: Final page of final step -> Check External Shorteners in Faucet Plan
     else {
       setIsRedirecting(true);
 
@@ -359,9 +363,37 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
         try { window.adslabShowInterstitial(); } catch (e) {}
       }
 
-      setTimeout(() => {
-        window.location.href = targetDest;
-      }, 400);
+      const shortenersCount = safelinkCfg.enableFaucetExternalShorteners ? (safelinkCfg.faucetExternalShortenersCount ?? 0) : 0;
+
+      if (shortenersCount > 0 && safelinkCfg.faucetExternalShortenerUrl) {
+        const vtok = 'vtok_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+        const realCode = (code && code.trim() && code !== 'demo') ? code.trim() : (fullParams.get('code') || fullParams.get('c') || 'phWVry');
+        const returnFinalUrl = `${window.location.origin}/faucet-final/${encodeURIComponent(realCode)}?vtok=${vtok}&url=${encodeURIComponent(targetDest)}`;
+
+        let externalUrl = safelinkCfg.faucetExternalShortenerUrl;
+        if (externalUrl.includes('{url}')) {
+          externalUrl = externalUrl.replace('{url}', encodeURIComponent(returnFinalUrl));
+        } else if (externalUrl.includes('{dest}')) {
+          externalUrl = externalUrl.replace('{dest}', encodeURIComponent(returnFinalUrl));
+        } else {
+          try {
+            const u = new URL(externalUrl);
+            u.searchParams.set('url', returnFinalUrl);
+            externalUrl = u.toString();
+          } catch (e) {
+            externalUrl = `${externalUrl}${externalUrl.includes('?') ? '&' : '?'}url=${encodeURIComponent(returnFinalUrl)}`;
+          }
+        }
+
+        setTimeout(() => {
+          window.location.href = externalUrl;
+        }, 400);
+      } else {
+        // NO external shorteners in Faucet Plan (0 shorteners): Return directly to original destination URL (originalUrl)
+        setTimeout(() => {
+          window.location.href = targetDest;
+        }, 400);
+      }
     }
   };
 

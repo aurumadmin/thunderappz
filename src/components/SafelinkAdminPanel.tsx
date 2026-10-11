@@ -87,10 +87,13 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
     faucetPagesPerStep: config.safelinkConfig?.faucetPagesPerStep ?? 3,
     faucetStepTimer: config.safelinkConfig?.faucetStepTimer ?? 10,
     faucetClicksRequiredPerStep: config.safelinkConfig?.faucetClicksRequiredPerStep ?? 1,
-    faucetDestinationUrl: config.safelinkConfig?.faucetDestinationUrl || 'https://tglinks.eu.cc/',
+    faucetDestinationUrl: (config.safelinkConfig?.faucetDestinationUrl && config.safelinkConfig.faucetDestinationUrl !== 'https://tglinks.eu.cc/') ? config.safelinkConfig.faucetDestinationUrl : '',
     faucetHeadingTitle: config.safelinkConfig?.faucetHeadingTitle || 'Continue',
     faucetStepMessage: config.safelinkConfig?.faucetStepMessage || 'There is no shortlink on this step. Simply click Continue once the timer finishes to proceed.',
     faucetButtonLabel: config.safelinkConfig?.faucetButtonLabel || 'Continue',
+    enableFaucetExternalShorteners: config.safelinkConfig?.enableFaucetExternalShorteners ?? false,
+    faucetExternalShortenersCount: config.safelinkConfig?.faucetExternalShortenersCount ?? 0,
+    faucetExternalShortenerUrl: config.safelinkConfig?.faucetExternalShortenerUrl || '',
     faucetAdSlots: config.safelinkConfig?.faucetAdSlots && config.safelinkConfig.faucetAdSlots.length > 0
       ? config.safelinkConfig.faucetAdSlots
       : DEFAULT_FAUCET_AD_SLOTS,
@@ -1540,6 +1543,68 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
                 <p className="text-[11px] text-slate-400 mt-1.5">
                   Fallback destination URL if no dynamic <code className="text-amber-400">?url=https://...</code> parameter is passed in link.
                 </p>
+              </div>
+
+              {/* Faucet Plan External Shortener Settings */}
+              <div className="p-4 bg-slate-950/90 border border-amber-500/30 rounded-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sliders className="w-4 h-4 text-amber-400" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
+                      External Shorteners in Faucet Plan
+                    </span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      checked={!!formConfig.enableFaucetExternalShorteners}
+                      onChange={(e) => setFormConfig({ 
+                        ...formConfig, 
+                        enableFaucetExternalShorteners: e.target.checked,
+                        faucetExternalShortenersCount: e.target.checked ? Math.max(1, formConfig.faucetExternalShortenersCount || 1) : 0
+                      })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
+                  </label>
+                </div>
+
+                <p className="text-[11px] text-slate-300 leading-relaxed">
+                  • <strong>0 Shorteners (Disabled)</strong>: Visitors complete <code className="text-amber-400">/faucet/:code</code> ad pages and return <strong>directly</strong> to the original destination URL (<code className="text-amber-400">originalUrl</code>).<br />
+                  • <strong>1+ Shortener (Enabled)</strong>: Visitors complete <code className="text-amber-400">/faucet/:code</code> ad pages, redirect to external shortener, and return to <code className="text-amber-400">/faucet-final/:code?vtok=...</code> which verifies completion and immediately forwards to <code className="text-amber-400">originalUrl</code>.
+                </p>
+
+                {formConfig.enableFaucetExternalShorteners && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-slate-800">
+                    <div>
+                      <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                        Number of External Shorteners
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={5}
+                        value={formConfig.faucetExternalShortenersCount ?? 1}
+                        onChange={(e) => setFormConfig({ ...formConfig, faucetExternalShortenersCount: Math.max(1, parseInt(e.target.value) || 1) })}
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-100 text-xs font-mono focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                        External Shortener Gateway URL / Template
+                      </label>
+                      <input
+                        type="text"
+                        value={formConfig.faucetExternalShortenerUrl || ''}
+                        onChange={(e) => setFormConfig({ ...formConfig, faucetExternalShortenerUrl: e.target.value })}
+                        placeholder="https://shortxlinks.com/shorten?url={url}"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-slate-100 text-xs font-mono focus:outline-none focus:border-amber-500"
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1">Use <code className="text-amber-400">{'{url}'}</code> placeholder for the return verification URL.</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
