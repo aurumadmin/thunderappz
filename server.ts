@@ -1,8 +1,8 @@
+import "dotenv/config";
 import express from "express";
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
-import { createServer as createViteServer } from "vite";
 import { DEFAULT_CONFIG, INITIAL_CUSTOM_POSTS } from "./src/types";
 
 // In-memory store for AdsLab S2S Captcha Verifications
@@ -184,7 +184,9 @@ function saveSiteData(data: { config?: any; customPosts?: any[] }) {
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+
+  // Trust reverse proxy (cPanel CloudLinux / Nginx / Apache Passenger reverse proxy)
+  app.set("trust proxy", 1);
 
   app.use(express.json({ limit: "10mb" }));
 
@@ -351,7 +353,7 @@ async function startServer() {
   app.get("/api/tglinks/tasks", async (req, res) => {
     try {
       const subId = req.query.sub_id || req.query.code || "";
-      const targetUrl = `https://tglinks.eu.cc/api/ptc/tasks?sub_id=${encodeURIComponent(String(subId))}`;
+      const targetUrl = `https://tglinks.tech/api/ptc/tasks?sub_id=${encodeURIComponent(String(subId))}`;
       
       const apiRes = await fetch(targetUrl, {
         headers: {
@@ -831,6 +833,7 @@ async function startServer() {
 
   // Vite middleware for development vs production
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true, allowedHosts: true },
       appType: "spa",
@@ -874,8 +877,36 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  // Handle both numeric ports (VPS / Local) and UNIX sockets / named pipes (cPanel Phusion Passenger)
+  const rawPort = process.env.PORT;
+  let isSocket = false;
+  let listenTarget: number | string = 3000;
+
+  if (rawPort) {
+    const parsed = parseInt(rawPort, 10);
+    if (isNaN(parsed) || rawPort.startsWith('/') || rawPort.startsWith('\\\\')) {
+      isSocket = true;
+      listenTarget = rawPort;
+    } else {
+      listenTarget = parsed;
+    }
+  }
+
+  const server = isSocket
+    ? app.listen(listenTarget, () => {
+        console.log(`[Production] Server listening on cPanel socket/pipe: ${listenTarget}`);
+      })
+    : app.listen(Number(listenTarget), "0.0.0.0", () => {
+        console.log(`[Production] Server running on http://0.0.0.0:${listenTarget}`);
+      });
+
+  server.on("error", (err: any) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(`[Fatal Startup Error] Target port/socket ${listenTarget} is already in use.`);
+    } else {
+      console.error("[Fatal Startup Error] Server failed to start:", err);
+    }
+    process.exit(1);
   });
 }
 

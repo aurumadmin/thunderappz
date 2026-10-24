@@ -1,0 +1,11 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/$USER/public_html/
+    - /bin/cp -R dist/ $DEPLOYPATH/dist/
+    - /bin/cp app.js $DEPLOYPATH/
+    - /bin/cp server.js $DEPLOYPATH/
+    - /bin/cp package.json $DEPLOYPATH/
+    - /bin/cp package-lock.json $DEPLOYPATH/ 2>/dev/null || :
+    - /bin/cp -R data/ $DEPLOYPATH/data/ 2>/dev/null || :
+    - /bin/cp -R public/ $DEPLOYPATH/public/ 2>/dev/null || :

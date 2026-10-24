@@ -193,37 +193,6 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
   const getFaucetDestinationUrl = (): string => {
     const rawUrlParam = fullParams.get('url') || fullParams.get('link') || fullParams.get('dest') || fullParams.get('target') || fullParams.get('originalUrl') || fullParams.get('return_url');
     
-    // 1. Check if an explicit destination URL was provided that is NOT a faucet loop route
-    if (
-      rawUrlParam && 
-      typeof rawUrlParam === 'string' &&
-      !rawUrlParam.includes('faucet-final') &&
-      !rawUrlParam.includes('/faucet/final') &&
-      !rawUrlParam.includes('/faucet?') &&
-      !rawUrlParam.endsWith('/faucet') &&
-      !rawUrlParam.endsWith('/faucet/') &&
-      (rawUrlParam.startsWith('http://') || rawUrlParam.startsWith('https://') || rawUrlParam.startsWith('/'))
-    ) {
-      if (rawUrlParam.startsWith('/')) {
-        return `${window.location.origin}${rawUrlParam}`;
-      }
-      return rawUrlParam;
-    }
-
-    // 2. Base64 encoded st_ URL
-    if (code && code.startsWith('st_')) {
-      try {
-        const b64 = code.replace('st_', '');
-        const decoded = atob(b64);
-        if (decoded.startsWith('http://') || decoded.startsWith('https://')) {
-          return decoded;
-        }
-      } catch (e) {
-        // ignore
-      }
-    }
-
-    // 3. Extract real params
     const realCode = (code && code.trim() && code !== 'demo') 
       ? code.trim() 
       : (fullParams.get('code') || fullParams.get('c') || fullParams.get('go') || fullParams.get('alias') || 'phWVry');
@@ -236,18 +205,59 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
 
     const vtok = 'vtok_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
 
-    // 4. Check if safelinkCfg.faucetDestinationUrl is configured and valid
+    // 1. Check if an explicit EXTERNAL destination URL was provided that is NOT on this site
+    if (
+      rawUrlParam && 
+      typeof rawUrlParam === 'string' &&
+      !rawUrlParam.includes('faucet-final') &&
+      !rawUrlParam.includes('/faucet/final') &&
+      !rawUrlParam.includes('/faucet?') &&
+      !rawUrlParam.endsWith('/faucet') &&
+      !rawUrlParam.endsWith('/faucet/') &&
+      !rawUrlParam.includes('thunder-appz.eu.org') &&
+      !rawUrlParam.includes(window.location.host) &&
+      !rawUrlParam.startsWith('/') &&
+      (rawUrlParam.startsWith('http://') || rawUrlParam.startsWith('https://'))
+    ) {
+      let target = rawUrlParam;
+      if (target.includes('tglinks') || target.includes('/go/')) {
+        if (!target.includes('vtok=')) {
+          target += (target.includes('?') ? '&' : '?') + 'vtok=' + vtok;
+        }
+      }
+      return target;
+    }
+
+    // 2. Base64 encoded st_ URL
+    if (code && code.startsWith('st_')) {
+      try {
+        const b64 = code.replace('st_', '');
+        const decoded = atob(b64);
+        if (
+          (decoded.startsWith('http://') || decoded.startsWith('https://')) &&
+          !decoded.includes('thunder-appz.eu.org') &&
+          !decoded.includes(window.location.host)
+        ) {
+          return decoded;
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // 3. Check if safelinkCfg.faucetDestinationUrl is configured with a valid external target
     if (
       safelinkCfg.faucetDestinationUrl && 
       safelinkCfg.faucetDestinationUrl.trim() !== '' &&
       !safelinkCfg.faucetDestinationUrl.includes('faucet-final') &&
-      !safelinkCfg.faucetDestinationUrl.includes(`${window.location.host}/faucet`) &&
+      !safelinkCfg.faucetDestinationUrl.includes('thunder-appz.eu.org') &&
+      !safelinkCfg.faucetDestinationUrl.includes(window.location.host) &&
       safelinkCfg.faucetDestinationUrl.startsWith('http')
     ) {
       let dest = safelinkCfg.faucetDestinationUrl.trim();
       if (dest.includes('{code}')) {
         dest = dest.replace('{code}', encodeURIComponent(realCode));
-      } else if (!dest.includes('/go/') && !dest.includes(realCode)) {
+      } else if (!dest.includes('/go/') && !dest.includes('/faucet/') && !dest.includes(realCode)) {
         dest = dest.replace(/\/$/, '') + '/go/' + encodeURIComponent(realCode);
       }
 
@@ -269,8 +279,8 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
       return dest;
     }
 
-    // 5. Direct to the TG Links steps completion page: https://tglinks.eu.cc/go/:code?vtok=...
-    const tglinksBase = 'https://tglinks.eu.cc';
+    // 4. Default return target: ALWAYS https://tglinks.tech/go/:code?vtok=...
+    const tglinksBase = 'https://tglinks.tech';
     const targetUrl = new URL(`${tglinksBase}/go/${encodeURIComponent(realCode)}`);
     targetUrl.searchParams.set('vtok', vtok);
     if (realToken) {
@@ -322,8 +332,6 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
   const handleAdvanceFaucetStep = () => {
     if (!isFaucetStepReady) return;
 
-    const targetDest = getFaucetDestinationUrl();
-
     // Case 1: Next page within the SAME step
     if (currentFaucetPage < faucetPagesPerStep) {
       const nextPage = currentFaucetPage + 1;
@@ -344,9 +352,12 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
       nextUrl.searchParams.set('page', String(nextPage));
       nextUrl.searchParams.set('total_steps', String(faucetTotalSteps));
       nextUrl.searchParams.set('pages_per_step', String(faucetPagesPerStep));
-      if (targetDest) {
-        nextUrl.searchParams.set('url', targetDest);
-      }
+
+      // Clean out local target parameters from searchParams to prevent pollution
+      nextUrl.searchParams.delete('url');
+      nextUrl.searchParams.delete('dest');
+      nextUrl.searchParams.delete('faucet_final');
+      nextUrl.searchParams.delete('vtok');
 
       window.location.href = nextUrl.toString();
     } 
@@ -370,13 +381,16 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
       nextUrl.searchParams.set('page', '1');
       nextUrl.searchParams.set('total_steps', String(faucetTotalSteps));
       nextUrl.searchParams.set('pages_per_step', String(faucetPagesPerStep));
-      if (targetDest) {
-        nextUrl.searchParams.set('url', targetDest);
-      }
+
+      // Clean out local target parameters from searchParams to prevent pollution
+      nextUrl.searchParams.delete('url');
+      nextUrl.searchParams.delete('dest');
+      nextUrl.searchParams.delete('faucet_final');
+      nextUrl.searchParams.delete('vtok');
 
       window.location.href = nextUrl.toString();
     } 
-    // Case 3: Final page of final step -> Redirect directly to tglinks completion URL with vtok
+    // Case 3: Final page of final step -> Redirect directly to https://tglinks.tech/go/:code?vtok=...
     else {
       setIsRedirecting(true);
 
@@ -521,7 +535,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
 
         // Try primary TG Links API
         try {
-          const primaryRes = await fetch('https://tglinks.eu.cc/api/captcha/verify-token', {
+          const primaryRes = await fetch('https://tglinks.tech/api/captcha/verify-token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(verifyPayload)
@@ -918,7 +932,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
     setIsRedirecting(true);
 
     const doRedirect = () => {
-      // TG Links handoff format: https://tglinks.eu.cc/p/:code?token={token}&status=completed
+      // TG Links handoff format: https://tglinks.tech/p/:code?token={token}&status=completed
       const realCode = (code && code.trim() && code !== 'demo') 
         ? code.trim() 
         : (fullParams.get('code') || fullParams.get('c') || fullParams.get('go') || fullParams.get('alias') || 'phWVry');
@@ -929,7 +943,7 @@ export const SafelinkView: React.FC<SafelinkViewProps> = ({
 
       const realSubId = subId || fullParams.get('sub_id') || fullParams.get('subid') || realCode;
 
-      const targetUrl = new URL(`https://tglinks.eu.cc/p/${encodeURIComponent(realCode)}`);
+      const targetUrl = new URL(`https://tglinks.tech/p/${encodeURIComponent(realCode)}`);
       targetUrl.searchParams.set('token', realToken);
       targetUrl.searchParams.set('status', 'completed');
       if (realSubId) {

@@ -87,7 +87,7 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
     faucetPagesPerStep: config.safelinkConfig?.faucetPagesPerStep ?? 3,
     faucetStepTimer: config.safelinkConfig?.faucetStepTimer ?? 10,
     faucetClicksRequiredPerStep: config.safelinkConfig?.faucetClicksRequiredPerStep ?? 1,
-    faucetDestinationUrl: (config.safelinkConfig?.faucetDestinationUrl && config.safelinkConfig.faucetDestinationUrl !== 'https://tglinks.eu.cc/') ? config.safelinkConfig.faucetDestinationUrl : '',
+    faucetDestinationUrl: (config.safelinkConfig?.faucetDestinationUrl && config.safelinkConfig.faucetDestinationUrl !== 'https://tglinks.tech/') ? config.safelinkConfig.faucetDestinationUrl : '',
     faucetHeadingTitle: config.safelinkConfig?.faucetHeadingTitle || 'Continue',
     faucetStepMessage: config.safelinkConfig?.faucetStepMessage || 'There is no shortlink on this step. Simply click Continue once the timer finishes to proceed.',
     faucetButtonLabel: config.safelinkConfig?.faucetButtonLabel || 'Continue',
@@ -1537,7 +1537,7 @@ export const SafelinkAdminPanel: React.FC<SafelinkAdminPanelProps> = ({
                   type="url"
                   value={formConfig.faucetDestinationUrl || ''}
                   onChange={(e) => setFormConfig({ ...formConfig, faucetDestinationUrl: e.target.value })}
-                  placeholder="https://tglinks.eu.cc/go/{code} or https://tglinks.eu.cc/"
+                  placeholder="https://tglinks.tech/go/{code} or https://tglinks.tech/"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-slate-100 text-xs focus:outline-none focus:border-amber-500 font-mono"
                 />
                 <p className="text-[11px] text-slate-400 mt-1.5">
