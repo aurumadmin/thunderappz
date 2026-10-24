@@ -198,12 +198,6 @@ function saveSiteData(data: { config?: any; customPosts?: any[] }) {
 }
 
 async function startServer() {
-  if ((global as any).__THUNDER_SERVER_STARTED__) {
-    console.warn("[Server] Instance already started; ignoring duplicate startServer() call.");
-    return;
-  }
-  (global as any).__THUNDER_SERVER_STARTED__ = true;
-
   const app = express();
 
   // Trust reverse proxy (cPanel CloudLinux / Nginx / Apache Passenger reverse proxy)
