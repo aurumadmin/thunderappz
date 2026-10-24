@@ -1,4 +1,19 @@
-import "dotenv/config";
+// Configure Phusion Passenger at the earliest moment before any http server is initialized
+if (typeof (global as any).PhusionPassenger !== "undefined") {
+  (global as any).PhusionPassenger.configure({ autoInstall: false });
+}
+
+// Safely load dotenv if available (for local dev/VPS), without crashing if missing in production cPanel
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const dotenv = require("dotenv");
+  if (dotenv && typeof dotenv.config === "function") {
+    dotenv.config();
+  }
+} catch {
+  // Dotenv is optional in production; environment variables are supplied by cPanel / system
+}
+
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -183,6 +198,12 @@ function saveSiteData(data: { config?: any; customPosts?: any[] }) {
 }
 
 async function startServer() {
+  if ((global as any).__THUNDER_SERVER_STARTED__) {
+    console.warn("[Server] Instance already started; ignoring duplicate startServer() call.");
+    return;
+  }
+  (global as any).__THUNDER_SERVER_STARTED__ = true;
+
   const app = express();
 
   // Trust reverse proxy (cPanel CloudLinux / Nginx / Apache Passenger reverse proxy)
@@ -877,7 +898,21 @@ async function startServer() {
     });
   }
 
-  // Handle both numeric ports (VPS / Local) and UNIX sockets / named pipes (cPanel Phusion Passenger)
+  // 1. Phusion Passenger environment (CloudLinux Node.js Selector / cPanel Passenger)
+  if (typeof (global as any).PhusionPassenger !== "undefined" || process.env.PORT === "passenger") {
+    console.log("[Production] Starting HTTP listener under Phusion Passenger...");
+    const server = app.listen("passenger", () => {
+      console.log("[Production] Server successfully started and listening under Phusion Passenger.");
+    });
+
+    server.on("error", (err: any) => {
+      console.error("[Fatal Startup Error] Phusion Passenger server error:", err);
+      process.exit(1);
+    });
+    return;
+  }
+
+  // 2. Standard numeric port or socket pipe (VPS / Docker / PM2 / Local Dev)
   const rawPort = process.env.PORT;
   let isSocket = false;
   let listenTarget: number | string = 3000;
@@ -894,7 +929,7 @@ async function startServer() {
 
   const server = isSocket
     ? app.listen(listenTarget, () => {
-        console.log(`[Production] Server listening on cPanel socket/pipe: ${listenTarget}`);
+        console.log(`[Production] Server listening on socket/pipe: ${listenTarget}`);
       })
     : app.listen(Number(listenTarget), "0.0.0.0", () => {
         console.log(`[Production] Server running on http://0.0.0.0:${listenTarget}`);
