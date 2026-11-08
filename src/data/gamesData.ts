@@ -14,6 +14,7 @@ export interface Game {
   featured?: boolean;
   newest?: boolean;
   popular?: boolean;
+  requiresShortenerToStart?: boolean;
 }
 
 export const GAME_CATEGORIES = [
@@ -87,7 +88,8 @@ export const INITIAL_GAMES: Game[] = [
     description: "Full open-world 3D GTA simulator experience right in your browser! Drive cars, complete missions, collect weapons, and explore the city streets.",
     controls: "WASD: Walk/Drive | Mouse: Aim/Look | Left Click: Shoot | F: Enter Vehicle | Space: Jump",
     featured: true,
-    popular: true
+    popular: true,
+    requiresShortenerToStart: true
   },
   {
     id: "game-5",
@@ -102,7 +104,8 @@ export const INITIAL_GAMES: Game[] = [
     description: "Multiplayer 3D First-Person Shooter with deep weapon customization, killstreaks, armor upgrades, and intense tactical team battles.",
     controls: "WASD: Move | Mouse: Aim/Shoot | R: Reload | Shift: Sprint | C: Crouch | 1-5: Weapons",
     featured: true,
-    popular: true
+    popular: true,
+    requiresShortenerToStart: true
   },
   {
     id: "game-6",
@@ -146,7 +149,8 @@ export const INITIAL_GAMES: Game[] = [
     description: "Open world 3D stickman action crime simulator! Steal cars, fight gang rivals, shoot weapons, and cause mayhem across the urban city.",
     controls: "WASD: Move/Steer | Mouse: Aim/Shoot | F: Steal Car | Space: Jump/Handbrake",
     popular: true,
-    featured: true
+    featured: true,
+    requiresShortenerToStart: true
   },
   {
     id: "game-9",
@@ -189,7 +193,8 @@ export const INITIAL_GAMES: Game[] = [
     description: "Build an empire of Brainrot characters that generate cash automatically, then infiltrate rival player bases to steal their rarest units!",
     controls: "WASD: Move | Mouse: Camera | E: Interact & Steal | Space: Jump",
     newest: true,
-    featured: true
+    featured: true,
+    requiresShortenerToStart: true
   },
   {
     id: "game-12",
@@ -204,7 +209,8 @@ export const INITIAL_GAMES: Game[] = [
     description: "Drive exotic supercars (Bugatti Veyron, Lamborghini, Pagani, LaFerrari) across 3 massive stunt arenas packed with loops and high ramps.",
     controls: "WASD / Arrow Keys: Drive | Spacebar: Handbrake | Shift: Nitro Boost | C: Camera",
     popular: true,
-    featured: true
+    featured: true,
+    requiresShortenerToStart: true
   },
   {
     id: "game-13",
@@ -218,7 +224,8 @@ export const INITIAL_GAMES: Game[] = [
     rating: 4.9,
     description: "The ultimate 3D tuning and drifting simulator! Upgrade 10 tuner vehicles and slide through 6 technical drift tracks to earn coins.",
     controls: "WASD / Arrow Keys: Steer & Throttle | Space: Handbrake | C: Change Camera View",
-    popular: true
+    popular: true,
+    requiresShortenerToStart: true
   },
   {
     "id": "game-14",
@@ -232,7 +239,8 @@ export const INITIAL_GAMES: Game[] = [
     "rating": 4.9,
     "description": "Counter-Strike online arena! Terrorists vs Counter-Terrorists battling on iconic maps with AK-47, M4A1, AWP snipers and desert eagles.",
     "controls": "WASD: Move | Left Click: Shoot | Right Click: Zoom Scope | R: Reload | B: Buy Weapons",
-    "popular": true
+    "popular": true,
+    "requiresShortenerToStart": true
   },
   {
     "id": "game-15",
@@ -483,7 +491,8 @@ export const INITIAL_GAMES: Game[] = [
     "controls": "Arrow keys / WASD: Jump, roll, and switch lanes | Space: Activate Hoverboard",
     "tags": ["3d", "runner", "casual", "subway-surfers"],
     "featured": true,
-    "popular": true
+    "popular": true,
+    "requiresShortenerToStart": true
   },
   {
     "id": "game-34",
@@ -499,7 +508,8 @@ export const INITIAL_GAMES: Game[] = [
     "controls": "Click and drag slingshot to adjust trajectory and power, release to launch.",
     "tags": ["physics", "puzzle", "angry-birds"],
     "featured": true,
-    "popular": true
+    "popular": true,
+    "requiresShortenerToStart": true
   },
   {
     "id": "game-35",
@@ -532,3 +542,155 @@ export const INITIAL_GAMES: Game[] = [
     "featured": true
   }
 ];
+
+export type ShortenerProviderId = "vplink" | "earnlinks" | "linkco";
+
+export interface ShortenerProvider {
+  id: ShortenerProviderId;
+  name: string;
+  domain: string;
+  apiBaseUrl: string;
+  quickLinkBaseUrl: string;
+  apiToken: string;
+}
+
+export const VPLINK_API_TOKEN = "85f94d452596fe752d1d71183007a12088a0285a";
+export const EARNLINKS_API_TOKEN = "c9a8b1733dbf489f3757d15c04ecaf29044ca251";
+export const LINKCO_API_TOKEN = "c4f3b602d93d8d1c26eb43f12eb3986865f1094a";
+
+export const SHORTENER_PROVIDERS: ShortenerProvider[] = [
+  {
+    id: "vplink",
+    name: "VPLINK",
+    domain: "vplink.in",
+    apiBaseUrl: "https://vplink.in/api",
+    quickLinkBaseUrl: "https://vplink.in/st",
+    apiToken: VPLINK_API_TOKEN,
+  },
+  {
+    id: "earnlinks",
+    name: "EarnLinks",
+    domain: "earnlinks.in",
+    apiBaseUrl: "https://earnlinks.in/api",
+    quickLinkBaseUrl: "https://earnlinks.in/st",
+    apiToken: EARNLINKS_API_TOKEN,
+  },
+  {
+    id: "linkco",
+    name: "LinkCo",
+    domain: "linkco.site",
+    apiBaseUrl: "https://linkco.site/api",
+    quickLinkBaseUrl: "https://linkco.site/st",
+    apiToken: LINKCO_API_TOKEN,
+  },
+];
+
+export const FREE_PLAY_DURATION_SECONDS = 180; // 3 minutes of free play before shortener is required
+export const SHORTENER_COOLDOWN_MS = 24 * 60 * 60 * 1000; // Use each shortener only once in 24 hours
+const UNLOCK_VALIDITY_MS = 24 * 60 * 60 * 1000; // 24 hours unlock per game
+
+const USED_SHORTENERS_STORAGE_KEY = "shortener_used_24h";
+
+export function getUsedShorteners24h(): Record<string, number> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(USED_SHORTENERS_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    const now = Date.now();
+    const active: Record<string, number> = {};
+    let changed = false;
+    for (const [providerId, ts] of Object.entries(parsed)) {
+      if (typeof ts === "number" && now - ts < SHORTENER_COOLDOWN_MS) {
+        active[providerId] = ts;
+      } else {
+        changed = true;
+      }
+    }
+    if (changed) {
+      localStorage.setItem(USED_SHORTENERS_STORAGE_KEY, JSON.stringify(active));
+    }
+    return active;
+  } catch {
+    return {};
+  }
+}
+
+export function markShortenerUsed24h(providerId: string): void {
+  if (typeof window === "undefined" || !providerId) return;
+  try {
+    const current = getUsedShorteners24h();
+    current[providerId] = Date.now();
+    localStorage.setItem(USED_SHORTENERS_STORAGE_KEY, JSON.stringify(current));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+export function getAvailableShortenerProviders(): ShortenerProvider[] {
+  const used = getUsedShorteners24h();
+  const available = SHORTENER_PROVIDERS.filter((p) => !used[p.id]);
+  return available.length > 0 ? available : SHORTENER_PROVIDERS;
+}
+
+export function isGameUnlocked(slug: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = localStorage.getItem(`vplink_unlocked_${slug}`);
+    if (!raw) return false;
+    const ts = parseInt(raw, 10);
+    if (isNaN(ts)) return false;
+    return Date.now() - ts < UNLOCK_VALIDITY_MS;
+  } catch {
+    return false;
+  }
+}
+
+export function markGameUnlocked(slug: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(`vplink_unlocked_${slug}`, String(Date.now()));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+// Deterministic pseudo-random generator seeded by gameId and hour index (returns 100..200 inclusive)
+export function getDeterministicHourlyIncrease(gameId: string, hourIndex: number): number {
+  let hash = 2166136261;
+  const input = `${gameId}:${hourIndex}`;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  const unsigned = hash >>> 0;
+  return 100 + (unsigned % 101); // 100 to 200 plays per hour
+}
+
+// Reference baseline hour so client fallback also increases every hour by 100-200 plays/game
+const BASELINE_HOUR_INDEX = Math.floor(new Date("2026-11-07T00:00:00Z").getTime() / 3600000);
+
+export function applyHourlyPlaysToGames(
+  baseGames: Game[],
+  serverPlays?: Record<string, number>
+): Game[] {
+  const currentHourIndex = Math.floor(Date.now() / 3600000);
+  const elapsedHours = Math.max(1, Math.min(2000, currentHourIndex - BASELINE_HOUR_INDEX));
+
+  return baseGames.map((game) => {
+    // Compute deterministic hourly bonus (100-200 per elapsed hour)
+    let hourlyBonus = 0;
+    for (let h = 1; h <= elapsedHours; h++) {
+      hourlyBonus += getDeterministicHourlyIncrease(game.id, BASELINE_HOUR_INDEX + h);
+    }
+    const clientComputedPlays = game.plays + hourlyBonus;
+    const serverCount = serverPlays?.[game.id];
+
+    return {
+      ...game,
+      plays: serverCount !== undefined ? Math.max(serverCount, clientComputedPlays) : clientComputedPlays,
+    };
+  });
+}
+

@@ -19,13 +19,110 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 import { DEFAULT_CONFIG, INITIAL_CUSTOM_POSTS } from "./src/types";
+import {
+  INITIAL_GAMES,
+  SHORTENER_PROVIDERS,
+  SHORTENER_COOLDOWN_MS,
+  ShortenerProvider,
+} from "./src/data/gamesData";
 
 // In-memory store for AdsLab S2S Captcha Verifications
 const captchaVerifications = new Map<string, { verified: boolean; timestamp: number; token?: string }>();
 
+// In-memory store for Shortener Game Unlock Verifications
+const vplinkUnlockTokens = new Map<
+  string,
+  { gameSlug: string; providerId: string; clientIp: string; createdAt: number; verified: boolean }
+>();
+
 const CONFIG_FILE_PATH = path.join(process.cwd(), "data", "site_config.json");
+const GAME_STATS_FILE_PATH = path.join(process.cwd(), "data", "game_stats.json");
+const SHORTENER_IP_USAGE_FILE_PATH = path.join(process.cwd(), "data", "shortener_ip_usage.json");
 
 const DEFAULT_SERVER_CONFIG = DEFAULT_CONFIG;
+
+interface GameStatsFile {
+  lastUpdatedHour: number;
+  plays: Record<string, number>;
+}
+
+function loadAndSyncGameStats(): GameStatsFile {
+  ensureDataDirExists();
+  const currentHour = Math.floor(Date.now() / 3600000);
+  let stats: GameStatsFile | null = null;
+
+  if (fs.existsSync(GAME_STATS_FILE_PATH)) {
+    try {
+      const raw = fs.readFileSync(GAME_STATS_FILE_PATH, "utf-8");
+      stats = JSON.parse(raw);
+    } catch (e) {
+      console.error("Error reading game_stats.json:", e);
+    }
+  }
+
+  let needsSave = false;
+  if (!stats || typeof stats.plays !== "object" || typeof stats.lastUpdatedHour !== "number") {
+    const initialPlays: Record<string, number> = {};
+    for (const g of INITIAL_GAMES) {
+      // Give an initial 1-hour random boost of 100-200 plays on first initialization
+      const randomIncrease = Math.floor(Math.random() * 101) + 100;
+      initialPlays[g.id] = g.plays + randomIncrease;
+    }
+    stats = {
+      lastUpdatedHour: currentHour,
+      plays: initialPlays,
+    };
+    needsSave = true;
+  } else {
+    // Ensure any newly added games are present
+    for (const g of INITIAL_GAMES) {
+      if (typeof stats.plays[g.id] !== "number") {
+        stats.plays[g.id] = g.plays + Math.floor(Math.random() * 101) + 100;
+        needsSave = true;
+      }
+    }
+
+    // If 1 or more hours have elapsed since lastUpdatedHour, increase every game by 100-200 plays per hour
+    const hoursElapsed = currentHour - stats.lastUpdatedHour;
+    if (hoursElapsed > 0) {
+      const cappedHours = Math.min(hoursElapsed, 720);
+      for (let h = 0; h < cappedHours; h++) {
+        for (const g of INITIAL_GAMES) {
+          const randomHourlyGain = Math.floor(Math.random() * 101) + 100; // 100 to 200 plays/hour
+          stats.plays[g.id] = (stats.plays[g.id] || g.plays) + randomHourlyGain;
+        }
+      }
+      stats.lastUpdatedHour = currentHour;
+      needsSave = true;
+    }
+  }
+
+  if (needsSave) {
+    try {
+      fs.writeFileSync(GAME_STATS_FILE_PATH, JSON.stringify(stats, null, 2), "utf-8");
+    } catch (e) {
+      console.error("Error writing game_stats.json:", e);
+    }
+  }
+
+  return stats;
+}
+
+function incrementSingleGamePlay(gameIdOrSlug: string): Record<string, number> {
+  const stats = loadAndSyncGameStats();
+  const matchedGame = INITIAL_GAMES.find(
+    (g) => g.id === gameIdOrSlug || g.slug === gameIdOrSlug
+  );
+  if (matchedGame) {
+    stats.plays[matchedGame.id] = (stats.plays[matchedGame.id] || matchedGame.plays) + 1;
+    try {
+      fs.writeFileSync(GAME_STATS_FILE_PATH, JSON.stringify(stats, null, 2), "utf-8");
+    } catch (e) {
+      console.error("Error saving single game play increment:", e);
+    }
+  }
+  return stats.plays;
+}
 
 function ensureDataDirExists() {
   const dir = path.dirname(CONFIG_FILE_PATH);
@@ -224,6 +321,381 @@ async function startServer() {
     } catch (err: any) {
       res.status(500).json({ status: "error", message: err?.message || "Failed to save config" });
     }
+  });
+
+  // =========================================================================
+  // GAME PLAY STATS & HOURLY AUTO-INCREASE (100-200 PLAYS/HOUR PER GAME)
+  // =========================================================================
+  // Initialize and check every 60 seconds for hourly rollover
+  loadAndSyncGameStats();
+  setInterval(() => {
+    try {
+      loadAndSyncGameStats();
+    } catch (e) {
+      console.error("Hourly game stats sync error:", e);
+    }
+  }, 60 * 1000);
+
+  app.get("/api/games/stats", (_req, res) => {
+    try {
+      const stats = loadAndSyncGameStats();
+      res.json({
+        status: "success",
+        lastUpdatedHour: stats.lastUpdatedHour,
+        plays: stats.plays,
+      });
+    } catch (err: any) {
+      res.status(500).json({ status: "error", message: err?.message || "Failed to load game stats" });
+    }
+  });
+
+  app.post("/api/games/play", (req, res) => {
+    try {
+      const { gameId } = req.body || {};
+      if (!gameId) {
+        return res.status(400).json({ status: "error", message: "gameId is required" });
+      }
+      const plays = incrementSingleGamePlay(String(gameId));
+      res.json({ status: "success", plays });
+    } catch (err: any) {
+      res.status(500).json({ status: "error", message: err?.message || "Failed to increment game play" });
+    }
+  });
+
+  // =========================================================================
+  // MULTI-SHORTENER API INTEGRATION (VPLINK, EARNLINKS, LINKCO)
+  // Enforces: Use 1 shortener only once in 24 hours per user / IP
+  // =========================================================================
+  const vplinkShortCache = new Map<string, string>();
+
+  function getRequestClientIp(req: express.Request): string {
+    const xff = req.headers["x-forwarded-for"];
+    let ip = (typeof xff === "string" ? xff.split(",")[0] : req.socket?.remoteAddress || "127.0.0.1").trim();
+    if (ip.startsWith("::ffff:")) {
+      ip = ip.replace("::ffff:", "");
+    }
+    return ip || "127.0.0.1";
+  }
+
+  function loadIpShortenerUsageMap(): Record<string, Record<string, number>> {
+    ensureDataDirExists();
+    const now = Date.now();
+    let allUsage: Record<string, Record<string, number>> = {};
+    if (fs.existsSync(SHORTENER_IP_USAGE_FILE_PATH)) {
+      try {
+        const raw = fs.readFileSync(SHORTENER_IP_USAGE_FILE_PATH, "utf-8");
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          allUsage = parsed;
+        }
+      } catch (e) {
+        console.error("Error reading shortener_ip_usage.json:", e);
+      }
+    }
+
+    let pruned = false;
+    for (const [ip, providerMap] of Object.entries(allUsage)) {
+      if (!providerMap || typeof providerMap !== "object") {
+        delete allUsage[ip];
+        pruned = true;
+        continue;
+      }
+      for (const [pid, ts] of Object.entries(providerMap)) {
+        if (typeof ts !== "number" || now - ts >= SHORTENER_COOLDOWN_MS) {
+          delete providerMap[pid];
+          pruned = true;
+        }
+      }
+      if (Object.keys(providerMap).length === 0) {
+        delete allUsage[ip];
+        pruned = true;
+      }
+    }
+
+    if (pruned) {
+      try {
+        fs.writeFileSync(SHORTENER_IP_USAGE_FILE_PATH, JSON.stringify(allUsage, null, 2), "utf-8");
+      } catch (e) {
+        console.error("Error pruning shortener_ip_usage.json:", e);
+      }
+    }
+
+    return allUsage;
+  }
+
+  function getIpUsedProviders24h(ip: string): Record<string, number> {
+    const allUsage = loadIpShortenerUsageMap();
+    return allUsage[ip] || {};
+  }
+
+  function markIpProviderUsed24h(ip: string, providerId: string): void {
+    if (!ip || !providerId) return;
+    const allUsage = loadIpShortenerUsageMap();
+    if (!allUsage[ip]) {
+      allUsage[ip] = {};
+    }
+    allUsage[ip][providerId] = Date.now();
+    try {
+      fs.writeFileSync(SHORTENER_IP_USAGE_FILE_PATH, JSON.stringify(allUsage, null, 2), "utf-8");
+    } catch (e) {
+      console.error("Error saving shortener_ip_usage.json:", e);
+    }
+  }
+
+  function selectOrderedShortenerCandidates(
+    clientUsedProviders: string[],
+    clientIp: string
+  ): ShortenerProvider[] {
+    const ipUsedMap = getIpUsedProviders24h(clientIp);
+    const usedSet = new Set<string>([
+      ...clientUsedProviders.filter(Boolean),
+      ...Object.keys(ipUsedMap),
+    ]);
+
+    const unusedProviders = SHORTENER_PROVIDERS.filter((p) => !usedSet.has(p.id));
+    if (unusedProviders.length > 0) {
+      // Strictly use only shorteners that have NOT been used in the last 24 hours
+      return unusedProviders;
+    }
+
+    // Only if all shorteners have already been used in the last 24 hours, sort by oldest usage
+    return [...SHORTENER_PROVIDERS].sort((a, b) => {
+      const tsA = ipUsedMap[a.id] || 0;
+      const tsB = ipUsedMap[b.id] || 0;
+      return tsA - tsB;
+    });
+  }
+
+  async function requestShortUrlFromProvider(
+    provider: ShortenerProvider,
+    encodedDest: string
+  ): Promise<string> {
+    const customAlias = `th${crypto.randomBytes(3).toString("hex")}`;
+    const jsonApiUrl = `${provider.apiBaseUrl}?api=${provider.apiToken}&url=${encodedDest}&alias=${customAlias}`;
+
+    try {
+      const res = await fetch(jsonApiUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0",
+        },
+      });
+      const text = await res.text();
+      try {
+        const data = JSON.parse(text);
+        if (data && data.status !== "error" && data.shortenedUrl) {
+          const parsedUrl = String(data.shortenedUrl)
+            .replace(/\\\//g, "/")
+            .replace(/^"+|"+$/g, "")
+            .trim();
+          if (parsedUrl.startsWith("http")) {
+            return parsedUrl;
+          }
+        }
+      } catch {
+        if (text.trim().startsWith("http")) {
+          return text.trim();
+        }
+      }
+    } catch (e) {
+      console.error(`[${provider.name}] primary JSON request error:`, e);
+    }
+
+    // Plain-text format fallback (&format=text)
+    try {
+      const textApiUrl = `${provider.apiBaseUrl}?api=${provider.apiToken}&url=${encodedDest}&format=text`;
+      const fbRes = await fetch(textApiUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0",
+        },
+      });
+      const fbText = (await fbRes.text()).trim();
+      if (fbText.startsWith("http")) {
+        return fbText;
+      }
+    } catch (e) {
+      console.error(`[${provider.name}] text fallback error:`, e);
+    }
+
+    return "";
+  }
+
+  async function generateVplinkShortenedUrl(
+    gameSlug: string,
+    returnUrl: string,
+    providedToken?: string,
+    clientUsedProviders: string[] = [],
+    clientIp: string = "127.0.0.1"
+  ) {
+    const unlockToken =
+      providedToken && providedToken.startsWith("vpl_")
+        ? providedToken
+        : `vpl_${crypto.randomBytes(10).toString("hex")}`;
+
+    // Clean up tokens older than 24 hours
+    const cutoff = Date.now() - SHORTENER_COOLDOWN_MS;
+    for (const [k, v] of vplinkUnlockTokens.entries()) {
+      if (v.createdAt < cutoff) vplinkUnlockTokens.delete(k);
+    }
+
+    const candidates = selectOrderedShortenerCandidates(clientUsedProviders, clientIp);
+    let chosenProvider: ShortenerProvider = candidates[0] || SHORTENER_PROVIDERS[0];
+    let shortenedUrl = "";
+
+    for (const candidate of candidates) {
+      const destObj = new URL(String(returnUrl));
+      destObj.searchParams.set("vp_unlock", unlockToken);
+      destObj.searchParams.set("sp", candidate.id);
+      const encodedDest = encodeURIComponent(destObj.toString());
+
+      const generated = await requestShortUrlFromProvider(candidate, encodedDest);
+      if (generated) {
+        chosenProvider = candidate;
+        shortenedUrl = generated;
+        vplinkShortCache.set(`${candidate.id}:${gameSlug}`, generated);
+        break;
+      }
+    }
+
+    if (!shortenedUrl) {
+      const destObj = new URL(String(returnUrl));
+      destObj.searchParams.set("vp_unlock", unlockToken);
+      destObj.searchParams.set("sp", chosenProvider.id);
+      const encodedDest = encodeURIComponent(destObj.toString());
+      const cached = vplinkShortCache.get(`${chosenProvider.id}:${gameSlug}`);
+      shortenedUrl =
+        cached || `${chosenProvider.quickLinkBaseUrl}?api=${chosenProvider.apiToken}&url=${encodedDest}`;
+    }
+
+    vplinkUnlockTokens.set(unlockToken, {
+      gameSlug: String(gameSlug),
+      providerId: chosenProvider.id,
+      clientIp,
+      createdAt: Date.now(),
+      verified: false,
+    });
+
+    return {
+      shortenedUrl,
+      unlockToken,
+      providerId: chosenProvider.id,
+      providerName: chosenProvider.name,
+    };
+  }
+
+  app.post("/api/vplink/shorten", async (req, res) => {
+    try {
+      const { gameSlug, returnUrl, token, usedProviders } = req.body || {};
+      if (!gameSlug || !returnUrl) {
+        return res.status(400).json({ status: "error", message: "gameSlug and returnUrl are required" });
+      }
+
+      const clientIp = getRequestClientIp(req);
+      const clientUsedList = Array.isArray(usedProviders)
+        ? usedProviders.map((p) => String(p))
+        : [];
+
+      const { shortenedUrl, unlockToken, providerId, providerName } = await generateVplinkShortenedUrl(
+        String(gameSlug),
+        String(returnUrl),
+        token ? String(token) : undefined,
+        clientUsedList,
+        clientIp
+      );
+
+      return res.json({
+        status: "success",
+        shortenedUrl,
+        token: unlockToken,
+        providerId,
+        providerName,
+      });
+    } catch (err: any) {
+      console.error("Error in /api/vplink/shorten:", err);
+      res.status(500).json({ status: "error", message: err?.message || "Failed to shorten link" });
+    }
+  });
+
+  // Direct GET redirect endpoint for opening shortener in a new page/tab (_blank) with zero iframe
+  app.get("/api/vplink/go/:gameSlug", async (req, res) => {
+    try {
+      const gameSlug = String(req.params.gameSlug || "");
+      const token = req.query.token ? String(req.query.token) : undefined;
+      const usedParam = req.query.used ? String(req.query.used) : "";
+      const clientUsedList = usedParam
+        ? usedParam.split(",").map((s) => s.trim()).filter(Boolean)
+        : [];
+      const clientIp = getRequestClientIp(req);
+
+      const protocol = req.headers["x-forwarded-proto"] || req.protocol || "https";
+      const host = req.get("host");
+      const defaultReturnUrl = `${protocol}://${host}/game/${encodeURIComponent(gameSlug)}`;
+      const returnUrl = req.query.returnUrl ? String(req.query.returnUrl) : defaultReturnUrl;
+
+      const { shortenedUrl } = await generateVplinkShortenedUrl(
+        gameSlug,
+        returnUrl,
+        token,
+        clientUsedList,
+        clientIp
+      );
+      return res.redirect(302, shortenedUrl);
+    } catch (err) {
+      console.error("Error in /api/vplink/go/:gameSlug:", err);
+      return res.redirect(302, "/");
+    }
+  });
+
+  app.get("/api/vplink/verify", (req, res) => {
+    const token = String(req.query.token || "");
+    const gameSlug = String(req.query.gameSlug || "");
+    const queryProviderId = req.query.sp ? String(req.query.sp) : "";
+    if (!token || !token.startsWith("vpl_")) {
+      return res.status(400).json({ status: "error", verified: false });
+    }
+
+    const clientIp = getRequestClientIp(req);
+    const record = vplinkUnlockTokens.get(token);
+
+    if (record && (!gameSlug || record.gameSlug === gameSlug)) {
+      record.verified = true;
+      const resolvedProviderId = queryProviderId || record.providerId || "vplink";
+      record.providerId = resolvedProviderId;
+      markIpProviderUsed24h(record.clientIp || clientIp, resolvedProviderId);
+      return res.json({
+        status: "success",
+        verified: true,
+        providerId: resolvedProviderId,
+      });
+    }
+
+    // Also mark verified if server restarted while user was on shortener
+    const fallbackProviderId = queryProviderId || "vplink";
+    vplinkUnlockTokens.set(token, {
+      gameSlug: gameSlug || "unknown",
+      providerId: fallbackProviderId,
+      clientIp,
+      createdAt: Date.now(),
+      verified: true,
+    });
+    markIpProviderUsed24h(clientIp, fallbackProviderId);
+    return res.json({
+      status: "success",
+      verified: true,
+      providerId: fallbackProviderId,
+    });
+  });
+
+  app.get("/api/vplink/status", (req, res) => {
+    const token = String(req.query.token || "");
+    if (!token || !token.startsWith("vpl_")) {
+      return res.json({ status: "success", verified: false });
+    }
+    const record = vplinkUnlockTokens.get(token);
+    return res.json({
+      status: "success",
+      verified: Boolean(record && record.verified),
+      providerId: record?.providerId || undefined,
+    });
   });
 
   // =========================================================================

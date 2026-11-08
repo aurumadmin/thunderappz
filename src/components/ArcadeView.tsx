@@ -4,7 +4,7 @@ import {
   ArrowRight, Shield, Play, Star, Trophy, Zap, Compass 
 } from 'lucide-react';
 import { BlogConfig, CustomPost } from '../types';
-import { Game, GAME_CATEGORIES, INITIAL_GAMES } from '../data/gamesData';
+import { Game, GAME_CATEGORIES, INITIAL_GAMES, applyHourlyPlaysToGames } from '../data/gamesData';
 import { ZontalHeader } from './ZontalHeader';
 import { ZontalSidebar } from './ZontalSidebar';
 import { GameCard } from './GameCard';
@@ -30,7 +30,7 @@ export const ArcadeView: React.FC<ArcadeViewProps> = ({
   onNavigateBlogAdmin,
   onToggleTheme,
 }) => {
-  const [games, setGames] = useState<Game[]>(INITIAL_GAMES);
+  const [games, setGames] = useState<Game[]>(() => applyHourlyPlaysToGames(INITIAL_GAMES));
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'newest' | 'popular' | 'blogs'>('all');
@@ -44,6 +44,36 @@ export const ArcadeView: React.FC<ArcadeViewProps> = ({
     const p = parseInt(params.get('page') || '1', 10);
     return isNaN(p) || p < 1 ? 1 : p;
   });
+
+  // Sync hourly auto-increased plays (100-200 plays/game/hour) from backend and hourly interval
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchGameStats = async () => {
+      try {
+        const res = await fetch('/api/games/stats');
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted && data?.status === 'success' && data?.plays) {
+            setGames(applyHourlyPlaysToGames(INITIAL_GAMES, data.plays));
+            return;
+          }
+        }
+      } catch {
+        // Fallback to deterministic hourly calculation
+      }
+      if (isMounted) {
+        setGames(applyHourlyPlaysToGames(INITIAL_GAMES));
+      }
+    };
+
+    fetchGameStats();
+    const interval = setInterval(fetchGameStats, 60 * 1000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   // Deep Link Routing for Specific Game URLs
   const getGameFromUrl = (allGames: Game[]) => {
@@ -76,6 +106,18 @@ export const ArcadeView: React.FC<ArcadeViewProps> = ({
       document.title = `${initialGame.title} - Play Free Online | Zontal Arcade`;
     }
   }, [games]);
+
+  // Increment single game play count on server when a game is opened
+  useEffect(() => {
+    const initialGame = getGameFromUrl(INITIAL_GAMES);
+    if (initialGame) {
+      fetch('/api/games/play', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId: initialGame.id }),
+      }).catch(() => {});
+    }
+  }, []);
 
   const handleOpenGame = (game: Game) => {
     // Perform full page refresh navigation to specific game URL

@@ -1,6 +1,6 @@
 import React from 'react';
-import { Gamepad2, Play, Star } from 'lucide-react';
-import { Game } from '../data/gamesData';
+import { Gamepad2, Play, Star, Lock, Unlock } from 'lucide-react';
+import { Game, isGameUnlocked } from '../data/gamesData';
 
 interface GameCardProps {
   game: Game;
@@ -9,6 +9,8 @@ interface GameCardProps {
 }
 
 export const GameCard: React.FC<GameCardProps> = ({ game, onPlay, isDark }) => {
+  const unlocked = isGameUnlocked(game.slug);
+
   return (
     <div 
       onClick={() => onPlay(game)}
@@ -30,23 +32,49 @@ export const GameCard: React.FC<GameCardProps> = ({ game, onPlay, isDark }) => {
         {/* Hover Overlay Play Icon */}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
           <div className="w-12 h-12 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-lg shadow-rose-600/40 transform scale-75 group-hover:scale-100 transition-transform duration-300">
-            <Play className="w-6 h-6 ml-0.5 fill-current" />
+            {game.requiresShortenerToStart && !unlocked ? (
+              <Lock className="w-5 h-5" />
+            ) : (
+              <Play className="w-6 h-6 ml-0.5 fill-current" />
+            )}
           </div>
         </div>
 
         {/* Top Badges */}
         <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
-          {game.featured ? (
-            <span className="bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md shadow-md">
-              Featured
-            </span>
-          ) : game.newest ? (
-            <span className="bg-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md shadow-md">
-              New
-            </span>
-          ) : (
-            <span />
-          )}
+          <div className="flex items-center gap-1.5">
+            {game.featured ? (
+              <span className="bg-rose-600 text-white text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md shadow-md">
+                Featured
+              </span>
+            ) : game.newest ? (
+              <span className="bg-amber-500 text-slate-950 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md shadow-md">
+                New
+              </span>
+            ) : null}
+
+            {game.requiresShortenerToStart && (
+              <span
+                className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md shadow-md flex items-center gap-1 ${
+                  unlocked
+                    ? 'bg-emerald-600/95 text-white'
+                    : 'bg-slate-950/90 text-amber-400 border border-amber-500/30'
+                }`}
+              >
+                {unlocked ? (
+                  <>
+                    <Unlock className="w-2.5 h-2.5" />
+                    <span>Unlocked</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-2.5 h-2.5" />
+                    <span>Unlock to Play</span>
+                  </>
+                )}
+              </span>
+            )}
+          </div>
 
           <span className="bg-slate-950/80 backdrop-blur-sm text-amber-400 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md flex items-center gap-1 border border-white/10">
             <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
@@ -55,7 +83,7 @@ export const GameCard: React.FC<GameCardProps> = ({ game, onPlay, isDark }) => {
         </div>
       </div>
 
-      {/* Card Info Section (Matching Screenshot) */}
+      {/* Card Info Section */}
       <div className="p-3 sm:p-4 space-y-1.5 flex-1 flex flex-col justify-between">
         <div>
           <h3 className="font-bold text-sm sm:text-base text-slate-900 dark:text-slate-100 line-clamp-1 group-hover:text-rose-500 transition-colors">
@@ -73,7 +101,7 @@ export const GameCard: React.FC<GameCardProps> = ({ game, onPlay, isDark }) => {
           </div>
 
           <span className="text-[11px] font-bold text-rose-500 group-hover:text-rose-400 transition-colors flex items-center gap-1">
-            <span>Play</span>
+            <span>{game.requiresShortenerToStart && !unlocked ? 'Unlock' : 'Play'}</span>
             <Play className="w-2.5 h-2.5 fill-current" />
           </span>
         </div>
@@ -82,3 +110,4 @@ export const GameCard: React.FC<GameCardProps> = ({ game, onPlay, isDark }) => {
     </div>
   );
 };
+
