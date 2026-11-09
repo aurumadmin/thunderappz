@@ -543,7 +543,7 @@ export const INITIAL_GAMES: Game[] = [
   }
 ];
 
-export type ShortenerProviderId = "vplink" | "earnlinks" | "linkco";
+export type ShortenerProviderId = "iflylink" | "vplink" | "earnlinks" | "linkco";
 
 export interface ShortenerProvider {
   id: ShortenerProviderId;
@@ -554,11 +554,20 @@ export interface ShortenerProvider {
   apiToken: string;
 }
 
+export const IFLYLINK_API_TOKEN = "d50e9f33ac2ba0fa9871d0deb52a3ee1d09d9a9a";
 export const VPLINK_API_TOKEN = "85f94d452596fe752d1d71183007a12088a0285a";
 export const EARNLINKS_API_TOKEN = "c9a8b1733dbf489f3757d15c04ecaf29044ca251";
 export const LINKCO_API_TOKEN = "c4f3b602d93d8d1c26eb43f12eb3986865f1094a";
 
 export const SHORTENER_PROVIDERS: ShortenerProvider[] = [
+  {
+    id: "iflylink",
+    name: "iFlyLink",
+    domain: "iflylink.com",
+    apiBaseUrl: "https://iflylink.com/api",
+    quickLinkBaseUrl: "https://iflylink.com/st",
+    apiToken: IFLYLINK_API_TOKEN,
+  },
   {
     id: "vplink",
     name: "VPLINK",

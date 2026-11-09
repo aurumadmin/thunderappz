@@ -658,7 +658,7 @@ async function startServer() {
 
     if (record && (!gameSlug || record.gameSlug === gameSlug)) {
       record.verified = true;
-      const resolvedProviderId = queryProviderId || record.providerId || "vplink";
+      const resolvedProviderId = queryProviderId || record.providerId || "iflylink";
       record.providerId = resolvedProviderId;
       markIpProviderUsed24h(record.clientIp || clientIp, resolvedProviderId);
       return res.json({
@@ -669,7 +669,7 @@ async function startServer() {
     }
 
     // Also mark verified if server restarted while user was on shortener
-    const fallbackProviderId = queryProviderId || "vplink";
+    const fallbackProviderId = queryProviderId || "iflylink";
     vplinkUnlockTokens.set(token, {
       gameSlug: gameSlug || "unknown",
       providerId: fallbackProviderId,
