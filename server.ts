@@ -875,7 +875,7 @@ async function startServer() {
       const siteData = loadSavedSiteData();
       const apiKey = siteData.config?.safelinkConfig?.adsLabApiKey || "SDFM8H5AMK95EC4kLz9irGiwI86qEPvt3DjPpCM0";
       
-      const host = req.headers.host || "localhost:3000";
+      const host = req.headers.host || "localhost:3001";
       const protocol = req.headers["x-forwarded-proto"] || "https";
       const defaultReturnUrl = return_url || `${protocol}://${host}/go/${targetSubId}?sub_id=${encodeURIComponent(targetSubId)}&status=success`;
 
@@ -1378,14 +1378,21 @@ async function startServer() {
     return;
   }
 
-  // 2. Standard numeric port or socket pipe (VPS / Docker / PM2 / Local Dev)
-  const rawPort = process.env.PORT;
+  // 2. Standard numeric port or socket pipe (cPanel / VPS / Docker / PM2 / Local Dev)
+  // Check CLI --port argument first (used by dev runner), then APP_PORT / PORT env vars, defaulting to 3001
+  const portArgIndex = process.argv.indexOf("--port");
+  const cliPort =
+    portArgIndex !== -1 && process.argv[portArgIndex + 1]
+      ? process.argv[portArgIndex + 1]
+      : undefined;
+
+  const rawPort = cliPort || process.env.APP_PORT || process.env.PORT;
   let isSocket = false;
-  let listenTarget: number | string = 3000;
+  let listenTarget: number | string = 3001;
 
   if (rawPort) {
     const parsed = parseInt(rawPort, 10);
-    if (isNaN(parsed) || rawPort.startsWith('/') || rawPort.startsWith('\\\\')) {
+    if (isNaN(parsed) || rawPort.startsWith("/") || rawPort.startsWith("\\\\")) {
       isSocket = true;
       listenTarget = rawPort;
     } else {
@@ -1393,22 +1400,38 @@ async function startServer() {
     }
   }
 
-  const server = isSocket
-    ? app.listen(listenTarget, () => {
-        console.log(`[Production] Server listening on socket/pipe: ${listenTarget}`);
-      })
-    : app.listen(Number(listenTarget), "0.0.0.0", () => {
-        console.log(`[Production] Server running on http://0.0.0.0:${listenTarget}`);
-      });
+  if (isSocket) {
+    const server = app.listen(listenTarget, () => {
+      console.log(`[Production] Server listening on socket/pipe: ${listenTarget}`);
+    });
+    server.on("error", (err: any) => {
+      console.error("[Fatal Startup Error] Socket server failed to start:", err);
+      process.exit(1);
+    });
+    return;
+  }
 
-  server.on("error", (err: any) => {
-    if (err.code === "EADDRINUSE") {
-      console.error(`[Fatal Startup Error] Target port/socket ${listenTarget} is already in use.`);
-    } else {
-      console.error("[Fatal Startup Error] Server failed to start:", err);
-    }
-    process.exit(1);
-  });
+  const startNumericListener = (portToTry: number, retriesLeft: number) => {
+    const server = app.listen(portToTry, "0.0.0.0", () => {
+      process.env.PORT = String(portToTry);
+      console.log(`[Production] Server running on http://0.0.0.0:${portToTry}`);
+    });
+
+    server.on("error", (err: any) => {
+      if (err.code === "EADDRINUSE" && retriesLeft > 0) {
+        const nextPort = portToTry === 3000 ? 3001 : portToTry + 1;
+        console.warn(
+          `[Port Notice] Port ${portToTry} is already in use by another application. Automatically switching to port ${nextPort}...`
+        );
+        startNumericListener(nextPort, retriesLeft - 1);
+      } else {
+        console.error(`[Fatal Startup Error] Server failed to start on port ${portToTry}:`, err);
+        process.exit(1);
+      }
+    });
+  };
+
+  startNumericListener(Number(listenTarget), 10);
 }
 
 startServer();
