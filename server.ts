@@ -1378,17 +1378,26 @@ async function startServer() {
     return;
   }
 
-  // 2. Standard numeric port or socket pipe (cPanel / VPS / Docker / PM2 / Local Dev)
-  // Check CLI --port argument first (used by dev runner), then APP_PORT / PORT env vars, defaulting to 3001
+  // 2. Standard numeric port or socket pipe (HidenCloud Pterodactyl / cPanel / VPS / Docker / PM2 / Local Dev)
+  // Priority:
+  // 1) CLI --port argument (used by AI Studio dev runner)
+  // 2) SERVER_PORT / P_SERVER_PORT (automatically injected by HidenCloud / Pterodactyl Panel, e.g. 24597)
+  // 3) APP_PORT / PORT environment variables
+  // 4) Default to 24597 (for paloma.hidencloud.com:24597)
   const portArgIndex = process.argv.indexOf("--port");
   const cliPort =
     portArgIndex !== -1 && process.argv[portArgIndex + 1]
       ? process.argv[portArgIndex + 1]
       : undefined;
 
-  const rawPort = cliPort || process.env.APP_PORT || process.env.PORT;
+  const rawPort =
+    cliPort ||
+    process.env.SERVER_PORT ||
+    process.env.P_SERVER_PORT ||
+    process.env.APP_PORT ||
+    process.env.PORT;
   let isSocket = false;
-  let listenTarget: number | string = 3001;
+  let listenTarget: number | string = 24597;
 
   if (rawPort) {
     const parsed = parseInt(rawPort, 10);
@@ -1415,11 +1424,12 @@ async function startServer() {
     const server = app.listen(portToTry, "0.0.0.0", () => {
       process.env.PORT = String(portToTry);
       console.log(`[Production] Server running on http://0.0.0.0:${portToTry}`);
+      console.log(`Listening on port ${portToTry}`);
     });
 
     server.on("error", (err: any) => {
       if (err.code === "EADDRINUSE" && retriesLeft > 0) {
-        const nextPort = portToTry === 3000 ? 3001 : portToTry + 1;
+        const nextPort = portToTry === 3000 ? 24597 : portToTry + 1;
         console.warn(
           `[Port Notice] Port ${portToTry} is already in use by another application. Automatically switching to port ${nextPort}...`
         );
