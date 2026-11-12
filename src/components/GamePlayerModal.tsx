@@ -20,8 +20,9 @@ import {
   FREE_PLAY_DURATION_SECONDS, 
   isGameUnlocked, 
   markGameUnlocked,
-  getUsedShorteners24h,
-  markShortenerUsed24h
+  markShortenerUsed24h,
+  getDirectShortenerFallbackUrl,
+  shortenUrlForGameClient
 } from '../data/gamesData';
 import { AdSlot } from './AdSlot';
 import { BlogConfig } from '../types';
@@ -138,16 +139,13 @@ export const GamePlayerModal: React.FC<GamePlayerModalProps> = ({
       }
       setPendingToken(token);
 
-      const usedProviders = Object.keys(getUsedShorteners24h());
       const returnUrl = `${window.location.origin}/game/${game.slug}`;
-      fetch('/api/vplink/shorten', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gameSlug: game.slug, returnUrl, token, usedProviders }),
-      })
-        .then((r) => (r.ok ? r.json() : null))
+      const initialFallback = getDirectShortenerFallbackUrl(returnUrl, token);
+      localStorage.setItem(`vplink_pending_provider_${game.slug}`, initialFallback.providerId);
+
+      shortenUrlForGameClient(game.slug, returnUrl, token)
         .then((data) => {
-          if (data?.status === 'success' && data?.shortenedUrl) {
+          if (data?.shortenedUrl) {
             if (data.token) {
               localStorage.setItem(`vplink_pending_token_${game.slug}`, data.token);
               setPendingToken(data.token);
@@ -277,12 +275,11 @@ export const GamePlayerModal: React.FC<GamePlayerModalProps> = ({
     return `${mins}:${rem < 10 ? '0' : ''}${rem}`;
   };
 
-  // Build the external shortener URL that ALWAYS opens in a new browser tab/page (_blank), never in an iframe
+  // Build the external shortener URL that ALWAYS opens in a new browser tab/page (_blank), never in an iframe or internal /api/vplink/go path
   const returnUrl = `${window.location.origin}/game/${game.slug}`;
   const activeToken = pendingToken || `vpl_${game.slug}`;
-  const usedListCsv = Object.keys(getUsedShorteners24h()).join(',');
-  const fallbackGoUrl = `/api/vplink/go/${encodeURIComponent(game.slug)}?token=${encodeURIComponent(activeToken)}&returnUrl=${encodeURIComponent(returnUrl)}&used=${encodeURIComponent(usedListCsv)}`;
-  const shortenerNewPageHref = readyShortUrl || fallbackGoUrl;
+  const directExternalFallback = getDirectShortenerFallbackUrl(returnUrl, activeToken).shortenedUrl;
+  const shortenerNewPageHref = readyShortUrl || directExternalFallback;
 
   const handleToggleFullscreen = () => {
     const el = playerContainerRef.current;

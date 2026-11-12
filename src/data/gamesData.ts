@@ -637,10 +637,153 @@ export function markShortenerUsed24h(providerId: string): void {
   }
 }
 
-export function getAvailableShortenerProviders(): ShortenerProvider[] {
+export function getAvailableShortenerProviders(extraUsed: string[] = []): ShortenerProvider[] {
   const used = getUsedShorteners24h();
-  const available = SHORTENER_PROVIDERS.filter((p) => !used[p.id]);
+  const extraSet = new Set(extraUsed.filter(Boolean));
+  const available = SHORTENER_PROVIDERS.filter((p) => !used[p.id] && !extraSet.has(p.id));
   return available.length > 0 ? available : SHORTENER_PROVIDERS;
+}
+
+export function buildShortenerDestinationUrl(
+  returnUrl: string,
+  token: string,
+  providerId: string
+): string {
+  try {
+    const destObj = new URL(returnUrl);
+    destObj.searchParams.set("vp_unlock", token);
+    destObj.searchParams.set("sp", providerId);
+    return destObj.toString();
+  } catch {
+    const sep = returnUrl.includes("?") ? "&" : "?";
+    return `${returnUrl}${sep}vp_unlock=${encodeURIComponent(token)}&sp=${encodeURIComponent(providerId)}`;
+  }
+}
+
+export function getDirectShortenerFallbackUrl(
+  returnUrl: string,
+  token: string,
+  extraUsed: string[] = []
+): { shortenedUrl: string; providerId: string; providerName: string } {
+  const candidates = getAvailableShortenerProviders(extraUsed);
+  const top = candidates[0] || SHORTENER_PROVIDERS[0];
+  const destUrl = buildShortenerDestinationUrl(returnUrl, token, top.id);
+  const encodedDest = encodeURIComponent(destUrl);
+  return {
+    shortenedUrl: `${top.quickLinkBaseUrl}?api=${top.apiToken}&url=${encodedDest}`,
+    providerId: top.id,
+    providerName: top.name,
+  };
+}
+
+export async function shortenUrlForGameClient(
+  gameSlug: string,
+  returnUrl: string,
+  token: string,
+  extraUsed: string[] = []
+): Promise<{ shortenedUrl: string; token: string; providerId: string; providerName: string }> {
+  const usedProviders = Array.from(new Set([...Object.keys(getUsedShorteners24h()), ...extraUsed.filter(Boolean)]));
+
+  // 1. Try backend / Cloudflare Worker API first if available
+  try {
+    const res = await fetch("/api/vplink/shorten", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ gameSlug, returnUrl, token, usedProviders }),
+    });
+    const contentType = res.headers.get("content-type") || "";
+    if (res.ok && contentType.includes("application/json")) {
+      const data = await res.json();
+      if (
+        data?.status === "success" &&
+        typeof data?.shortenedUrl === "string" &&
+        data.shortenedUrl.startsWith("http") &&
+        !data.shortenedUrl.includes("/api/vplink/go/")
+      ) {
+        return {
+          shortenedUrl: data.shortenedUrl,
+          token: data.token || token,
+          providerId: data.providerId || "iflylink",
+          providerName: data.providerName || "iFlyLink",
+        };
+      }
+    }
+  } catch {
+    // Fallback to direct provider API calls below
+  }
+
+  // 2. Call the shortener provider APIs directly (all 4 support CORS *) in priority order
+  const candidates = getAvailableShortenerProviders(usedProviders);
+  for (const provider of candidates) {
+    const destUrl = buildShortenerDestinationUrl(returnUrl, token, provider.id);
+    const encodedDest = encodeURIComponent(destUrl);
+    const customAlias = `th${Math.random().toString(36).substring(2, 8)}`;
+
+    // Primary JSON API call
+    try {
+      const apiUrl = `${provider.apiBaseUrl}?api=${provider.apiToken}&url=${encodedDest}&alias=${customAlias}`;
+      const apiRes = await fetch(apiUrl, { headers: { Accept: "application/json, text/plain, */*" } });
+      if (apiRes.ok) {
+        const text = await apiRes.text();
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed && parsed.status !== "error" && parsed.shortenedUrl) {
+            const cleanUrl = String(parsed.shortenedUrl)
+              .replace(/\\\//g, "/")
+              .replace(/^"+|"+$/g, "")
+              .trim();
+            if (cleanUrl.startsWith("http")) {
+              return {
+                shortenedUrl: cleanUrl,
+                token,
+                providerId: provider.id,
+                providerName: provider.name,
+              };
+            }
+          }
+        } catch {
+          if (text.trim().startsWith("http")) {
+            return {
+              shortenedUrl: text.trim(),
+              token,
+              providerId: provider.id,
+              providerName: provider.name,
+            };
+          }
+        }
+      }
+    } catch {
+      // Try text format fallback
+    }
+
+    // Plain-text API call (&format=text)
+    try {
+      const textUrl = `${provider.apiBaseUrl}?api=${provider.apiToken}&url=${encodedDest}&format=text`;
+      const textRes = await fetch(textUrl);
+      if (textRes.ok) {
+        const rawText = (await textRes.text()).trim();
+        if (rawText.startsWith("http")) {
+          return {
+            shortenedUrl: rawText,
+            token,
+            providerId: provider.id,
+            providerName: provider.name,
+          };
+        }
+      }
+    } catch {
+      // Continue to next candidate
+    }
+  }
+
+  // 3. Guaranteed external fallback using the highest-priority unused provider's /st endpoint
+  const fallback = getDirectShortenerFallbackUrl(returnUrl, token, usedProviders);
+  return {
+    shortenedUrl: fallback.shortenedUrl,
+    token,
+    providerId: fallback.providerId,
+    providerName: fallback.providerName,
+  };
 }
 
 export function isGameUnlocked(slug: string): boolean {

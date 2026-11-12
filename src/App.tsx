@@ -13,6 +13,7 @@ import { AdsLabSdkInit } from './components/AdsLabSdkInit';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { BlogConfig, DEFAULT_CONFIG, CustomPost, INITIAL_CUSTOM_POSTS, getPostCategories } from './types';
 import { fetchDlSurfCreatorPosts, FALLBACK_THUNDERBOLT_POSTS } from './lib/dlsurfApi';
+import { shortenUrlForGameClient, getDirectShortenerFallbackUrl } from './data/gamesData';
 import { 
   Sparkles, ArrowLeft, BookOpen, Clock, Calendar, ChevronRight, User, 
   Shield, Compass, Search, TrendingUp, Send, Mail, Share2, Grid, Tag, Newspaper 
@@ -106,8 +107,33 @@ export default function App() {
     };
   };
 
+  const [isRedirectingShortener, setIsRedirectingShortener] = useState<boolean>(() => {
+    return typeof window !== 'undefined' && window.location.pathname.startsWith('/api/vplink/go/');
+  });
+
   // Load configuration and custom posts on mount from server and local cache
   useEffect(() => {
+    // 0. If static host rewrote /api/vplink/go/:gameSlug to index.html, resolve & redirect to external shortener immediately
+    if (window.location.pathname.startsWith('/api/vplink/go/')) {
+      setIsRedirectingShortener(true);
+      const rawSlug = decodeURIComponent(window.location.pathname.replace(/^\/api\/vplink\/go\/?/, '')) || 'game';
+      const searchParams = new URLSearchParams(window.location.search);
+      const token = searchParams.get('token') || `vpl_${Math.random().toString(36).substring(2, 12)}`;
+      const returnUrl = searchParams.get('returnUrl') || `${window.location.origin}/game/${encodeURIComponent(rawSlug)}`;
+      const usedCsv = searchParams.get('used') || '';
+      const extraUsed = usedCsv ? usedCsv.split(',').map((s) => s.trim()).filter(Boolean) : [];
+
+      shortenUrlForGameClient(rawSlug, returnUrl, token, extraUsed)
+        .then((res) => {
+          window.location.replace(res.shortenedUrl);
+        })
+        .catch(() => {
+          const fallback = getDirectShortenerFallbackUrl(returnUrl, token, extraUsed);
+          window.location.replace(fallback.shortenedUrl);
+        });
+      return;
+    }
+
     // 1. Initial Parse from Local Storage for fast UI start
     const storedConfig = localStorage.getItem(STORAGE_KEY);
     let parsedConfig: Partial<BlogConfig> = {};
@@ -579,6 +605,15 @@ export default function App() {
 
   // Find if current slug matches any custom local post
   const matchedCustomPost = customPosts.find(p => p.slug === activePostSlug);
+
+  if (isRedirectingShortener) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-10 h-10 rounded-full border-2 border-rose-500 border-t-transparent animate-spin mb-4" />
+        <p className="text-sm font-mono text-slate-300">Redirecting to verification link...</p>
+      </div>
+    );
+  }
 
   return (
     <ErrorBoundary>
