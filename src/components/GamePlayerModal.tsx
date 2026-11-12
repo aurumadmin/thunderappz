@@ -19,6 +19,7 @@ import {
   Game, 
   FREE_PLAY_DURATION_SECONDS, 
   isGameUnlocked, 
+  getUnlockedRemainingSeconds,
   markGameUnlocked,
   markShortenerUsed24h,
   getDirectShortenerFallbackUrl,
@@ -47,8 +48,9 @@ export const GamePlayerModal: React.FC<GamePlayerModalProps> = ({
   const [copied, setCopied] = useState<boolean>(false);
   const [playCount, setPlayCount] = useState<number>(0);
 
-  // Shortener Gate States (Rotates VPLINK -> EarnLinks -> LinkCo, 1 use per 24h each)
+  // Shortener Gate States (Rotates iFlyLink -> VPLINK -> EarnLinks -> LinkCo, 1 use per 24h each, 1h game access per unlock)
   const [unlocked, setUnlocked] = useState<boolean>(false);
+  const [unlockedRemainingSeconds, setUnlockedRemainingSeconds] = useState<number>(3600);
   const [remainingSeconds, setRemainingSeconds] = useState<number>(FREE_PLAY_DURATION_SECONDS);
   const [isGateLocked, setIsGateLocked] = useState<boolean>(false);
   const [readyShortUrl, setReadyShortUrl] = useState<string>('');
@@ -108,6 +110,7 @@ export const GamePlayerModal: React.FC<GamePlayerModalProps> = ({
           localStorage.removeItem(`vplink_pending_provider_${game.slug}`);
           sessionStorage.removeItem(`vplink_remaining_${game.slug}`);
           setUnlocked(true);
+          setUnlockedRemainingSeconds(getUnlockedRemainingSeconds(game.slug) || 3600);
           setIsGateLocked(false);
           setJustUnlockedBanner(true);
           setTimeout(() => setJustUnlockedBanner(false), 6000);
@@ -122,11 +125,12 @@ export const GamePlayerModal: React.FC<GamePlayerModalProps> = ({
         }
       }
 
-      // Otherwise check existing unlock status
+      // Otherwise check existing 1-hour unlock status
       const alreadyUnlocked = isGameUnlocked(game.slug);
       setUnlocked(alreadyUnlocked);
 
       if (alreadyUnlocked) {
+        setUnlockedRemainingSeconds(getUnlockedRemainingSeconds(game.slug));
         setIsGateLocked(false);
         return;
       }
@@ -198,6 +202,7 @@ export const GamePlayerModal: React.FC<GamePlayerModalProps> = ({
       localStorage.removeItem(`vplink_pending_provider_${game.slug}`);
       sessionStorage.removeItem(`vplink_remaining_${game.slug}`);
       setUnlocked(true);
+      setUnlockedRemainingSeconds(getUnlockedRemainingSeconds(game.slug) || 3600);
       setIsGateLocked(false);
       setAwaitingNewTabCompletion(false);
       setJustUnlockedBanner(true);
@@ -266,6 +271,44 @@ export const GamePlayerModal: React.FC<GamePlayerModalProps> = ({
 
     return () => clearInterval(timer);
   }, [game, unlocked, isGateLocked]);
+
+  // 1-hour unlocked access countdown timer; re-locks when 1 hour expires and prepares next unused shortener
+  useEffect(() => {
+    if (!game || !unlocked) return;
+
+    const timer = setInterval(() => {
+      const rem = getUnlockedRemainingSeconds(game.slug);
+      setUnlockedRemainingSeconds(rem);
+      if (rem <= 0) {
+        setUnlocked(false);
+        setIsGateLocked(true);
+        setRemainingSeconds(0);
+        setReadyShortUrl('');
+
+        // Prepare a new unlock token for the next unused shortener
+        const nextToken = `vpl_${Math.random().toString(36).substring(2, 12)}${Date.now().toString(36)}`;
+        localStorage.setItem(`vplink_pending_token_${game.slug}`, nextToken);
+        setPendingToken(nextToken);
+
+        const returnUrl = `${window.location.origin}/game/${game.slug}`;
+        const initialFallback = getDirectShortenerFallbackUrl(returnUrl, nextToken);
+        localStorage.setItem(`vplink_pending_provider_${game.slug}`, initialFallback.providerId);
+
+        shortenUrlForGameClient(game.slug, returnUrl, nextToken)
+          .then((data) => {
+            if (data?.shortenedUrl) {
+              if (data.providerId) {
+                localStorage.setItem(`vplink_pending_provider_${game.slug}`, String(data.providerId));
+              }
+              setReadyShortUrl(data.shortenedUrl);
+            }
+          })
+          .catch(() => {});
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [game, unlocked]);
 
   if (!game) return null;
 
@@ -346,7 +389,7 @@ export const GamePlayerModal: React.FC<GamePlayerModalProps> = ({
           {unlocked ? (
             <div className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-bold">
               <Unlock className="w-3.5 h-3.5" />
-              <span>Full Game Unlocked</span>
+              <span>Unlocked ({formatCountdown(unlockedRemainingSeconds)})</span>
             </div>
           ) : !isGateLocked && !game.requiresShortenerToStart ? (
             <a
@@ -405,7 +448,7 @@ export const GamePlayerModal: React.FC<GamePlayerModalProps> = ({
           <div className="p-4 rounded-2xl bg-emerald-950/80 border border-emerald-500/40 text-emerald-200 flex items-center justify-between gap-4 shadow-lg">
             <div className="flex items-center gap-3 text-xs sm:text-sm font-semibold">
               <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
-              <span>Shortener verification completed! <strong>{game.title}</strong> is now unlocked for unlimited play.</span>
+              <span>Shortener verification completed! <strong>{game.title}</strong> is now unlocked for 1 hour of play.</span>
             </div>
             <button
               onClick={() => setJustUnlockedBanner(false)}
@@ -422,7 +465,7 @@ export const GamePlayerModal: React.FC<GamePlayerModalProps> = ({
           className="relative w-full aspect-[16/9] max-h-[75vh] bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl group"
         >
           {isGateLocked ? (
-            /* VPLINK Shortener Gate Overlay (Opens shortener in a new page only, no iframe) */
+            /* Shortener Gate Overlay (Opens shortener in a new page only, no iframe) */
             <div className="relative w-full h-full flex items-center justify-center p-6 text-center select-none overflow-hidden">
               {/* Blurred Background Game Artwork */}
               <img
@@ -439,7 +482,7 @@ export const GamePlayerModal: React.FC<GamePlayerModalProps> = ({
 
                 <div className="space-y-2">
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-mono font-bold uppercase tracking-wider">
-                    {game.requiresShortenerToStart ? 'Verification Required to Start' : 'Free Playtime Limit Reached'}
+                    {game.requiresShortenerToStart ? 'Verification Required to Start' : 'Playtime Limit Reached'}
                   </span>
                   <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                     {game.requiresShortenerToStart
@@ -448,8 +491,8 @@ export const GamePlayerModal: React.FC<GamePlayerModalProps> = ({
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
                     {game.requiresShortenerToStart
-                      ? 'This featured game requires completing a quick shortener link before starting. Click below to open the shortener in a new page and unlock full access for 24 hours!'
-                      : 'Your free preview playtime has ended! Click below to open the shortener in a new page and unlock unlimited continuous gameplay for 24 hours.'}
+                      ? 'This featured game requires completing a quick shortener link before starting. Click below to open the shortener in a new page and unlock full access for 1 hour!'
+                      : 'Your current playtime session has ended! Click below to open the shortener in a new page and unlock 1 hour of continuous gameplay.'}
                   </p>
                 </div>
 
@@ -482,7 +525,7 @@ export const GamePlayerModal: React.FC<GamePlayerModalProps> = ({
                     </div>
                   ) : (
                     <p className="text-[11px] text-slate-400 font-mono">
-                      Opens in a new browser tab • Unlocks automatically for 24h
+                      Opens in a new browser tab • Unlocks automatically for 1 hour
                     </p>
                   )}
                 </div>

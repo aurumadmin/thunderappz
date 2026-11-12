@@ -596,7 +596,7 @@ export const SHORTENER_PROVIDERS: ShortenerProvider[] = [
 
 export const FREE_PLAY_DURATION_SECONDS = 180; // 3 minutes of free play before shortener is required
 export const SHORTENER_COOLDOWN_MS = 24 * 60 * 60 * 1000; // Use each shortener only once in 24 hours
-const UNLOCK_VALIDITY_MS = 24 * 60 * 60 * 1000; // 24 hours unlock per game
+export const UNLOCK_VALIDITY_MS = 1 * 60 * 60 * 1000; // 1 hour game access per shortlink completion
 
 const USED_SHORTENERS_STORAGE_KEY = "shortener_used_24h";
 
@@ -793,9 +793,31 @@ export function isGameUnlocked(slug: string): boolean {
     if (!raw) return false;
     const ts = parseInt(raw, 10);
     if (isNaN(ts)) return false;
-    return Date.now() - ts < UNLOCK_VALIDITY_MS;
+    if (Date.now() - ts < UNLOCK_VALIDITY_MS) {
+      return true;
+    }
+    localStorage.removeItem(`vplink_unlocked_${slug}`);
+    return false;
   } catch {
     return false;
+  }
+}
+
+export function getUnlockedRemainingSeconds(slug: string): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const raw = localStorage.getItem(`vplink_unlocked_${slug}`);
+    if (!raw) return 0;
+    const ts = parseInt(raw, 10);
+    if (isNaN(ts)) return 0;
+    const remainingMs = ts + UNLOCK_VALIDITY_MS - Date.now();
+    if (remainingMs <= 0) {
+      localStorage.removeItem(`vplink_unlocked_${slug}`);
+      return 0;
+    }
+    return Math.ceil(remainingMs / 1000);
+  } catch {
+    return 0;
   }
 }
 
